@@ -20,19 +20,17 @@
             color: #e5e7eb;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
-            touch-action: none; /* Prevents scrolling/zooming */
-            user-select: none; /* Prevents accidental text highlighting */
+            touch-action: none; 
+            user-select: none; 
             -webkit-user-select: none;
         }
 
-        /* 3-Panel Layout */
         #game-interface {
             display: flex;
             width: 100vw;
             height: 100vh;
         }
 
-        /* Side Control Panels */
         .control-panel {
             width: 20%;
             height: 100%;
@@ -48,15 +46,34 @@
             touch-action: none;
         }
 
-        .panel-label {
+        /* Sensitivity Controls */
+        .settings-container {
             position: absolute;
             top: 20px;
-            font-size: 0.9rem;
+            width: 80%;
+            text-align: center;
+            pointer-events: auto;
+        }
+
+        .panel-label {
+            font-size: 0.8rem;
             font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             color: #888;
-            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .sensitivity-slider {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        .sensitivity-value {
+            font-size: 0.7rem;
+            color: var(--accent-color);
+            margin-top: 4px;
         }
 
         /* Virtual Joystick Base */
@@ -67,6 +84,7 @@
             background: rgba(255,255,255,0.05);
             border: 2px solid rgba(255,255,255,0.1);
             position: relative;
+            margin-top: 40px;
         }
 
         .joystick-knob {
@@ -77,13 +95,11 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            /* Removed transition so it follows finger instantly */
         }
 
         #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
         #drill-pad .joystick-knob { background: var(--drill-color); box-shadow: 0 0 15px var(--drill-color); }
 
-        /* Central Viewport */
         #viewport {
             width: 60%;
             height: 100%;
@@ -157,7 +173,11 @@
 
 <div id="game-interface">
     <div class="control-panel" id="mirror-pad">
-        <div class="panel-label">Mirror<br>Pad</div>
+        <div class="settings-container">
+            <div class="panel-label">Mirror Sensitivity</div>
+            <input type="range" id="mirror-sens" class="sensitivity-slider" min="0" max="100" value="100">
+            <div class="sensitivity-value" id="mirror-sens-val">100%</div>
+        </div>
         <div class="joystick-base" id="mirror-base">
             <div class="joystick-knob" id="mirror-knob"></div>
         </div>
@@ -180,7 +200,11 @@
     </div>
 
     <div class="control-panel" id="drill-pad">
-        <div class="panel-label">Drill<br>Pad</div>
+        <div class="settings-container">
+            <div class="panel-label">Drill Sensitivity</div>
+            <input type="range" id="drill-sens" class="sensitivity-slider" min="0" max="100" value="100">
+            <div class="sensitivity-value" id="drill-sens-val">100%</div>
+        </div>
         <div class="joystick-base" id="drill-base">
             <div class="joystick-knob" id="drill-knob"></div>
         </div>
@@ -201,6 +225,10 @@
         y: 0,
         cavities: []
     };
+
+    // Sensitivity State
+    let mirrorSens = 1.0;
+    let drillSens = 1.0;
 
     // --- 2. SET UP RESPONSIVE CANVAS ---
     function resizeCanvas() {
@@ -231,13 +259,13 @@
         x: canvas.width / 2,
         y: canvas.height / 2,
         radius: 65,
-        speed: 5
+        baseSpeed: 5
     };
 
     const drillInput = {
         x: canvas.width / 2 + 100,
         y: canvas.height / 2,
-        speed: 6,
+        baseSpeed: 6,
         isDrilling: false
     };
 
@@ -254,7 +282,7 @@
         }
     }
 
-    // --- BULLETPROOF HYBRID JOYSTICK IMPLEMENTATION ---
+    // --- JOYSTICK LOGIC ---
     function updateJoystick(clientPos, base, knob, stickData) {
         const rect = base.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
@@ -282,6 +310,9 @@
 
         const startDrag = (e) => {
             if (!gameActive) return;
+            // Don't trigger if touching sliders
+            if(e.target.type === 'range') return;
+            
             e.preventDefault();
             stickData.active = true;
             
@@ -295,7 +326,6 @@
 
         const moveDrag = (e) => {
             if (!stickData.active) return;
-            e.preventDefault();
             
             if (e.type === 'touchmove') {
                 for (let i = 0; i < e.changedTouches.length; i++) {
@@ -332,13 +362,10 @@
             knob.style.transform = `translate(-50%, -50%)`;
         };
 
-        // Touch Listeners (attached to the pad)
         pad.addEventListener('touchstart', startDrag, {passive: false});
         pad.addEventListener('touchmove', moveDrag, {passive: false});
         pad.addEventListener('touchend', endDrag);
         pad.addEventListener('touchcancel', endDrag);
-
-        // Mouse Listeners (move and up attached to window to prevent drops)
         pad.addEventListener('mousedown', startDrag);
         window.addEventListener('mousemove', moveDrag);
         window.addEventListener('mouseup', endDrag);
@@ -346,6 +373,28 @@
 
     setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
     setupJoystick('drill-pad', 'drill-base', 'drill-knob', joysticks.drill);
+
+    // --- SENSITIVITY CONTROLS ---
+    const mSlider = document.getElementById('mirror-sens');
+    const dSlider = document.getElementById('drill-sens');
+    const mValLabel = document.getElementById('mirror-sens-val');
+    const dValLabel = document.getElementById('drill-sens-val');
+
+    mSlider.addEventListener('input', (e) => {
+        mirrorSens = e.target.value / 100;
+        mValLabel.innerText = `${e.target.value}%`;
+    });
+
+    dSlider.addEventListener('input', (e) => {
+        drillSens = e.target.value / 100;
+        dValLabel.innerText = `${e.target.value}%`;
+    });
+
+    // Prevent slider touches from bubbling to joystick pads
+    [mSlider, dSlider].forEach(s => {
+        s.addEventListener('touchstart', (e) => e.stopPropagation());
+        s.addEventListener('mousedown', (e) => e.stopPropagation());
+    });
 
     // Start Button Event
     startBtn.addEventListener('click', startGame);
@@ -370,23 +419,21 @@
     function update() {
         if (!gameActive) return;
 
-        // Apply joystick velocities
+        // Apply joystick velocities with sensitivity
         if (joysticks.mirror.active) {
-            mirror.x += joysticks.mirror.dX * mirror.speed;
-            mirror.y += joysticks.mirror.dY * mirror.speed;
+            mirror.x += joysticks.mirror.dX * (mirror.baseSpeed * mirrorSens);
+            mirror.y += joysticks.mirror.dY * (mirror.baseSpeed * mirrorSens);
         }
 
-        // Clamp mirror inside viewport
         mirror.x = Math.max(mirror.radius, Math.min(canvas.width - mirror.radius, mirror.x));
         mirror.y = Math.max(mirror.radius, Math.min(canvas.height - mirror.radius, mirror.y));
 
         if (joysticks.drill.active) {
-            drillInput.x += joysticks.drill.dX * drillInput.speed;
-            drillInput.y += joysticks.drill.dY * drillInput.speed;
+            drillInput.x += joysticks.drill.dX * (drillInput.baseSpeed * drillSens);
+            drillInput.y += joysticks.drill.dY * (drillInput.baseSpeed * drillSens);
         }
         drillInput.isDrilling = joysticks.drill.active;
 
-        // Reflected Rendering Math
         const drillRenderX = tooth.x - (drillInput.x - tooth.x);
         const drillRenderY = tooth.y - (drillInput.y - tooth.y);
 
@@ -421,41 +468,33 @@
         requestAnimationFrame(update);
     }
 
-    // --- Isometric Drawing Functions ---
+    // --- Drawing Functions ---
     const isoScaleY = 0.6;
     const toothHeight = 40;
 
     function draw(drX, drY) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. Real World (Dimmed Mouth)
         ctx.globalAlpha = 0.1;
         drawToothIso(ctx, tooth.x, tooth.y, false);
         ctx.globalAlpha = 1.0;
 
-        // Draw the ACTUAL physical drill in the dark mouth space
         drawDrillIso(ctx, drillInput.x, drillInput.y);
 
-        // 2. Mirror Reflection (Clipping Mask)
         ctx.save();
         ctx.beginPath();
         ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
         ctx.clip();
 
-        // Bright mirror background
         ctx.fillStyle = '#151212';
         ctx.fillRect(0,0, canvas.width, canvas.height);
         
-        // Draw bright tooth and components inside mirror
         drawToothIso(ctx, tooth.x, tooth.y, true);
         drawParticles(ctx);
-        
-        // Draw the REFLECTED drill inside the mirror
         drawDrillIso(ctx, drX, drY);
 
         ctx.restore();
 
-        // 3. Mirror Frame overlay
         ctx.strokeStyle = '#aab2b8';
         ctx.lineWidth = 10;
         ctx.beginPath();
@@ -468,7 +507,6 @@
         ctx.arc(mirror.x, mirror.y, mirror.radius - 5, 0, Math.PI * 2);
         ctx.stroke();
 
-        // --- Dynamic Mirror Handle ---
         const targetX = -100; 
         const targetY = canvas.height + 100;
         const angle = Math.atan2(targetY - mirror.y, targetX - mirror.x);
@@ -485,7 +523,6 @@
         ctx.stroke();
     }
 
-    // --- Organic Molar Shape ---
     function drawMolarPath(context, x, y) {
         context.beginPath();
         context.moveTo(x - 50, y - 60 * isoScaleY);
@@ -496,7 +533,6 @@
         context.closePath();
     }
 
-    // --- Fissures (Grooves) ---
     function drawFissures(context, x, y, isBright) {
         context.beginPath();
         context.moveTo(x - 35, y);
@@ -512,7 +548,6 @@
         context.strokeStyle = isBright ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.5)';
         context.lineWidth = 3;
         context.lineCap = 'round';
-        context.lineJoin = 'round';
         context.stroke();
     }
 
@@ -552,15 +587,11 @@
     function drawDrillIso(context, x, y) {
         context.save();
         context.translate(x, y);
-        
-        // Tilt drill
         context.rotate(-Math.PI / 8); 
 
-        // Handle
         context.fillStyle = '#555';
         context.fillRect(-7, -140, 14, 120);
         
-        // Head / Shaft
         const hg = context.createLinearGradient(-12, -20, 12, -20);
         hg.addColorStop(0, '#888'); hg.addColorStop(0.5, '#eee'); hg.addColorStop(1, '#888');
         context.fillStyle = hg;
@@ -580,11 +611,9 @@
             context.ellipse(0, -10, 10, 4, 0, 0, Math.PI*2);
             context.stroke();
         }
-
         context.restore();
     }
 
-    // --- Particle System ---
     let particles = [];
     function createParticles(x, y) {
         for(let i=0; i<3; i++) {
@@ -617,7 +646,6 @@
         });
         context.globalAlpha = 1.0;
     }
-
 </script>
 </body>
 </html>
