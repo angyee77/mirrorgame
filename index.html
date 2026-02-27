@@ -125,7 +125,6 @@
             padding: 30px 40px;
             border-radius: 16px;
             text-align: center;
-            display: none;
             border: 2px solid var(--accent-color);
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
             z-index: 20;
@@ -174,7 +173,7 @@
             <h2>Dental Operation</h2>
             <p><b>Left Pad:</b> Guide the Mirror<br><b>Right Pad:</b> Guide the Drill</p>
             <p style="font-size: 0.9rem; color: #888;">Note: The drill's movement is inverted inside the reflection!</p>
-            <button class="btn" onclick="startGame()">Commence</button>
+            <button id="start-btn" class="btn">Commence</button>
         </div>
     </div>
 
@@ -191,7 +190,17 @@
     const ctx = canvas.getContext('2d');
     const viewport = document.getElementById('viewport');
     
-    // Resize canvas dynamically and keep tooth centered
+    // --- 1. INITIALIZE STATE VARIABLES ---
+    let gameActive = false;
+    let score = 0;
+
+    const tooth = {
+        x: 0, 
+        y: 0,
+        cavities: []
+    };
+
+    // --- 2. SET UP RESPONSIVE CANVAS ---
     function resizeCanvas() {
         const rect = viewport.getBoundingClientRect();
         canvas.width = rect.width;
@@ -207,9 +216,7 @@
 
     const scoreDisplay = document.getElementById('score-display');
     const startScreen = document.getElementById('start-screen');
-
-    let gameActive = false;
-    let score = 0;
+    const startBtn = document.getElementById('start-btn');
 
     // Joysticks State
     const joysticks = {
@@ -221,7 +228,7 @@
     const mirror = {
         x: canvas.width / 2,
         y: canvas.height / 2,
-        radius: 65, // Shrunk to match molar size
+        radius: 65,
         speed: 5
     };
 
@@ -232,19 +239,12 @@
         isDrilling: false
     };
 
-    // Tooth State
-    const tooth = {
-        x: 0, 
-        y: 0,
-        cavities: []
-    };
-
     function generateCavities() {
         tooth.cavities = [];
         for(let i = 0; i < 5; i++) {
             tooth.cavities.push({
-                relX: (Math.random() - 0.5) * 70, // Constrained X for molar shape
-                relY: (Math.random() - 0.5) * 80, // Constrained Y for molar shape
+                relX: (Math.random() - 0.5) * 70, 
+                relY: (Math.random() - 0.5) * 80, 
                 radius: 8 + Math.random() * 6,
                 health: 100,
                 cleared: false
@@ -286,29 +286,11 @@
         pad.addEventListener('pointercancel', resetJoystick);
     }
 
-    function updateJoystick(e, base, knob, stickData) {
-        const rect = base.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        let dx = e.clientX - centerX;
-        let dy = e.clientY - centerY;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist > stickData.maxDist) {
-            dx = (dx / dist) * stickData.maxDist;
-            dy = (dy / dist) * stickData.maxDist;
-        }
-
-        // Normalize output from -1.0 to 1.0
-        stickData.dX = dx / stickData.maxDist;
-        stickData.dY = dy / stickData.maxDist;
-
-        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    }
-
     setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
     setupJoystick('drill-pad', 'drill-base', 'drill-knob', joysticks.drill);
+
+    // Bulletproof event listener attachment
+    startBtn.addEventListener('click', startGame);
 
     function startGame() {
         gameActive = true;
@@ -393,7 +375,11 @@
         drawToothIso(ctx, tooth.x, tooth.y, false);
         ctx.globalAlpha = 1.0;
 
-        // 2. Mirror Reflection
+        // Draw the ACTUAL physical drill in the dark mouth space
+        // This lets the player see their hand moving outside the mirror!
+        drawDrillIso(ctx, drillInput.x, drillInput.y);
+
+        // 2. Mirror Reflection (Clipping Mask)
         ctx.save();
         ctx.beginPath();
         ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
@@ -406,6 +392,8 @@
         // Draw bright tooth and components inside mirror
         drawToothIso(ctx, tooth.x, tooth.y, true);
         drawParticles(ctx);
+        
+        // Draw the REFLECTED drill inside the mirror
         drawDrillIso(ctx, drX, drY);
 
         ctx.restore();
@@ -423,19 +411,16 @@
         ctx.arc(mirror.x, mirror.y, mirror.radius - 5, 0, Math.PI * 2);
         ctx.stroke();
 
-        // --- NEW: Dynamic Mirror Handle ---
-        // Angle points towards the bottom-left corner of the canvas
+        // --- Dynamic Mirror Handle ---
         const targetX = -100; 
         const targetY = canvas.height + 100;
         const angle = Math.atan2(targetY - mirror.y, targetX - mirror.x);
         
-        // Start handle exactly at the edge of the mirror
         const handleStartX = mirror.x + Math.cos(angle) * (mirror.radius + 2);
         const handleStartY = mirror.y + Math.sin(angle) * (mirror.radius + 2);
         
         ctx.beginPath();
         ctx.moveTo(handleStartX, handleStartY);
-        // Draw a long line off-screen
         ctx.lineTo(handleStartX + Math.cos(angle) * 1000, handleStartY + Math.sin(angle) * 1000); 
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 14;
@@ -510,12 +495,6 @@
     function drawDrillIso(context, x, y) {
         context.save();
         context.translate(x, y);
-        
-        // --- NEW: Draw Drill Shadow ---
-        context.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        context.beginPath();
-        context.ellipse(0, 20, 8, 4, 0, 0, Math.PI*2); 
-        context.fill();
         
         // Tilt drill
         context.rotate(-Math.PI / 8); 
