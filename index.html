@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Mirror Challenge</title>
+    <title>Dental Mirror Challenge - Upper Arch Edition</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -43,20 +43,18 @@
             position: relative;
             z-index: 10;
             box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            touch-action: none;
         }
 
-        /* Sensitivity Controls */
         .settings-container {
             position: absolute;
             top: 20px;
-            width: 80%;
+            width: 85%;
             text-align: center;
-            pointer-events: auto;
+            z-index: 25;
         }
 
         .panel-label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -76,7 +74,6 @@
             margin-top: 4px;
         }
 
-        /* Virtual Joystick Base */
         .joystick-base {
             width: 100px;
             height: 100px;
@@ -84,7 +81,8 @@
             background: rgba(255,255,255,0.05);
             border: 2px solid rgba(255,255,255,0.1);
             position: relative;
-            margin-top: 40px;
+            margin-top: 60px;
+            pointer-events: none; /* Let the pad handle events */
         }
 
         .joystick-knob {
@@ -95,6 +93,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            pointer-events: none;
         }
 
         #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
@@ -104,7 +103,7 @@
             width: 60%;
             height: 100%;
             position: relative;
-            background: radial-gradient(circle at center, #201010 0%, #050505 100%);
+            background: radial-gradient(circle at center, #2a1515 0%, #050505 100%);
             overflow: hidden;
         }
 
@@ -120,19 +119,14 @@
             left: 20px;
             pointer-events: none;
             background: rgba(0, 0, 0, 0.7);
-            padding: 15px 25px;
+            padding: 12px 20px;
             border-radius: 12px;
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 15;
         }
 
-        .stats {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #fff;
-            margin-bottom: 5px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
+        .stats { font-size: 1.1rem; font-weight: bold; color: #fff; }
 
         .msg-box {
             position: absolute;
@@ -145,13 +139,10 @@
             text-align: center;
             border: 2px solid var(--accent-color);
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            z-index: 20;
+            z-index: 100;
             width: 80%;
             max-width: 400px;
         }
-
-        .msg-box h2 { margin-top: 0; color: #fff; }
-        .msg-box p { color: #bbb; line-height: 1.5; }
 
         .btn {
             background: var(--accent-color);
@@ -163,10 +154,8 @@
             margin-top: 15px;
             font-weight: bold;
             font-size: 1.1rem;
-            transition: transform 0.1s;
+            pointer-events: auto;
         }
-        
-        .btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -174,40 +163,33 @@
 <div id="game-interface">
     <div class="control-panel" id="mirror-pad">
         <div class="settings-container">
-            <div class="panel-label">Mirror Sensitivity</div>
+            <div class="panel-label">Mirror Sens</div>
             <input type="range" id="mirror-sens" class="sensitivity-slider" min="0" max="100" value="100">
             <div class="sensitivity-value" id="mirror-sens-val">100%</div>
         </div>
-        <div class="joystick-base" id="mirror-base">
-            <div class="joystick-knob" id="mirror-knob"></div>
-        </div>
+        <div class="joystick-base" id="mirror-base"><div class="joystick-knob" id="mirror-knob"></div></div>
     </div>
 
     <div id="viewport">
         <canvas id="gameCanvas"></canvas>
-        
         <div class="ui-overlay">
             <div class="stats" id="score-display">Cavities Cleared: 0</div>
-            <div style="font-size: 0.8rem; opacity: 0.7;">Isometric Surgery V2</div>
+            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Arch V3.1</div>
         </div>
-
-        <div class="msg-box" id="start-screen" style="display: block;">
-            <h2>Dental Operation</h2>
-            <p><b>Left Pad:</b> Guide the Mirror<br><b>Right Pad:</b> Guide the Drill</p>
-            <p style="font-size: 0.9rem; color: #888;">Note: The drill's movement is inverted inside the reflection!</p>
+        <div class="msg-box" id="start-screen">
+            <h2>Upper Arch Training</h2>
+            <p>Guide the mirror to see the reflection.<br>Drill the irregular cavities.</p>
             <button id="start-btn" class="btn">Commence</button>
         </div>
     </div>
 
     <div class="control-panel" id="drill-pad">
         <div class="settings-container">
-            <div class="panel-label">Drill Sensitivity</div>
+            <div class="panel-label">Drill Sens</div>
             <input type="range" id="drill-sens" class="sensitivity-slider" min="0" max="100" value="100">
             <div class="sensitivity-value" id="drill-sens-val">100%</div>
         </div>
-        <div class="joystick-base" id="drill-base">
-            <div class="joystick-knob" id="drill-knob"></div>
-        </div>
+        <div class="joystick-base" id="drill-base"><div class="joystick-knob" id="drill-knob"></div></div>
     </div>
 </div>
 
@@ -216,91 +198,64 @@
     const ctx = canvas.getContext('2d');
     const viewport = document.getElementById('viewport');
     
-    // --- 1. INITIALIZE STATE VARIABLES ---
     let gameActive = false;
     let score = 0;
-
-    const tooth = {
-        x: 0, 
-        y: 0,
-        cavities: []
-    };
-
-    // Sensitivity State
     let mirrorSens = 1.0;
     let drillSens = 1.0;
 
-    // --- 2. SET UP RESPONSIVE CANVAS ---
-    function resizeCanvas() {
-        const rect = viewport.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = rect.height;
-        
-        if (gameActive) {
-            tooth.x = canvas.width / 2;
-            tooth.y = canvas.height / 2;
-        }
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    const scoreDisplay = document.getElementById('score-display');
-    const startScreen = document.getElementById('start-screen');
-    const startBtn = document.getElementById('start-btn');
-
-    // Joysticks State
+    const arch = { teeth: [] };
     const joysticks = {
         mirror: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 },
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
-    // Simulation Objects
-    const mirror = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        radius: 65,
-        baseSpeed: 5
-    };
+    const mirror = { x: 0, y: 0, radius: 95, baseSpeed: 5 };
+    const drillInput = { x: 0, y: 0, baseSpeed: 6, isDrilling: false };
 
-    const drillInput = {
-        x: canvas.width / 2 + 100,
-        y: canvas.height / 2,
-        baseSpeed: 6,
-        isDrilling: false
-    };
+    function initArch() {
+        arch.teeth = [];
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2 + 60;
+        const a = canvas.width * 0.25; 
+        const b = canvas.height * 0.35; 
+
+        for (let i = 0; i < 14; i++) {
+            const t = (i / 13) * Math.PI - Math.PI; 
+            const tx = centerX + a * Math.cos(t);
+            const ty = centerY + b * Math.sin(t);
+            let type = (i >= 5 && i <= 8) ? "anterior" : (i === 4 || i === 9 || i === 3 || i === 10) ? "premolar" : "molar";
+            arch.teeth.push({ x: tx, y: ty, type: type, cavities: [] });
+        }
+        generateCavities();
+    }
 
     function generateCavities() {
-        tooth.cavities = [];
-        for(let i = 0; i < 5; i++) {
-            tooth.cavities.push({
-                relX: (Math.random() - 0.5) * 70, 
-                relY: (Math.random() - 0.5) * 80, 
-                radius: 8 + Math.random() * 6,
-                health: 100,
-                cleared: false
-            });
+        arch.teeth.forEach(t => t.cavities = []);
+        for (let i = 0; i < 2; i++) {
+            const randomTooth = arch.teeth[Math.floor(Math.random() * arch.teeth.length)];
+            const points = [];
+            const numPoints = 10;
+            const baseRad = 10 + Math.random() * 8;
+            for (let p = 0; p < numPoints; p++) {
+                const angle = (p / numPoints) * Math.PI * 2;
+                const r = baseRad * (0.6 + Math.random() * 0.8);
+                points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+            }
+            randomTooth.cavities.push({ points, health: 100, cleared: false, radius: baseRad });
         }
     }
 
-    // --- JOYSTICK LOGIC ---
     function updateJoystick(clientPos, base, knob, stickData) {
         const rect = base.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        let dx = clientPos.clientX - centerX;
-        let dy = clientPos.clientY - centerY;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist > stickData.maxDist) {
-            dx = (dx / dist) * stickData.maxDist;
-            dy = (dy / dist) * stickData.maxDist;
-        }
-
-        stickData.dX = dx / stickData.maxDist;
-        stickData.dY = dy / stickData.maxDist;
-
-        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        const dx = clientPos.clientX - (rect.left + rect.width / 2);
+        const dy = clientPos.clientY - (rect.top + rect.height / 2);
+        const dist = Math.min(Math.hypot(dx, dy), stickData.maxDist);
+        const angle = Math.atan2(dy, dx);
+        const finalX = Math.cos(angle) * dist;
+        const finalY = Math.sin(angle) * dist;
+        stickData.dX = finalX / stickData.maxDist;
+        stickData.dY = finalY / stickData.maxDist;
+        knob.style.transform = `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px))`;
     }
 
     function setupJoystick(padId, baseId, knobId, stickData) {
@@ -308,344 +263,174 @@
         const base = document.getElementById(baseId);
         const knob = document.getElementById(knobId);
 
-        const startDrag = (e) => {
-            if (!gameActive) return;
-            // Don't trigger if touching sliders
-            if(e.target.type === 'range') return;
-            
+        const start = (e) => {
+            if (!gameActive || e.target.type === 'range') return;
             e.preventDefault();
             stickData.active = true;
-            
-            if (e.type === 'touchstart') {
-                stickData.id = e.changedTouches[0].identifier;
-                updateJoystick(e.changedTouches[0], base, knob, stickData);
-            } else {
-                updateJoystick(e, base, knob, stickData);
-            }
+            const touch = e.type === 'touchstart' ? e.changedTouches[0] : e;
+            if (e.type === 'touchstart') stickData.id = touch.identifier;
+            updateJoystick(touch, base, knob, stickData);
         };
 
-        const moveDrag = (e) => {
+        const move = (e) => {
             if (!stickData.active) return;
-            
+            let touch;
             if (e.type === 'touchmove') {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === stickData.id) {
-                        updateJoystick(e.changedTouches[i], base, knob, stickData);
-                        break;
-                    }
-                }
-            } else {
-                updateJoystick(e, base, knob, stickData);
-            }
+                touch = Array.from(e.changedTouches).find(t => t.identifier === stickData.id);
+            } else { touch = e; }
+            if (touch) updateJoystick(touch, base, knob, stickData);
         };
 
-        const endDrag = (e) => {
-            if (!stickData.active) return;
-            
-            if (e.type.includes('touch')) {
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier === stickData.id) {
-                        resetStick();
-                        break;
-                    }
-                }
-            } else {
-                resetStick();
-            }
-        };
-
-        const resetStick = () => {
+        const end = () => {
             stickData.active = false;
-            stickData.id = null;
-            stickData.dX = 0;
-            stickData.dY = 0;
+            stickData.dX = 0; stickData.dY = 0;
             knob.style.transform = `translate(-50%, -50%)`;
         };
 
-        pad.addEventListener('touchstart', startDrag, {passive: false});
-        pad.addEventListener('touchmove', moveDrag, {passive: false});
-        pad.addEventListener('touchend', endDrag);
-        pad.addEventListener('touchcancel', endDrag);
-        pad.addEventListener('mousedown', startDrag);
-        window.addEventListener('mousemove', moveDrag);
-        window.addEventListener('mouseup', endDrag);
+        pad.addEventListener('touchstart', start, {passive: false});
+        window.addEventListener('touchmove', move, {passive: false});
+        window.addEventListener('touchend', end);
+        pad.addEventListener('mousedown', start);
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', end);
     }
 
     setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
     setupJoystick('drill-pad', 'drill-base', 'drill-knob', joysticks.drill);
 
-    // --- SENSITIVITY CONTROLS ---
-    const mSlider = document.getElementById('mirror-sens');
-    const dSlider = document.getElementById('drill-sens');
-    const mValLabel = document.getElementById('mirror-sens-val');
-    const dValLabel = document.getElementById('drill-sens-val');
-
-    mSlider.addEventListener('input', (e) => {
+    document.getElementById('mirror-sens').oninput = (e) => {
         mirrorSens = e.target.value / 100;
-        mValLabel.innerText = `${e.target.value}%`;
-    });
-
-    dSlider.addEventListener('input', (e) => {
+        document.getElementById('mirror-sens-val').innerText = e.target.value + '%';
+    };
+    document.getElementById('drill-sens').oninput = (e) => {
         drillSens = e.target.value / 100;
-        dValLabel.innerText = `${e.target.value}%`;
-    });
-
-    // Prevent slider touches from bubbling to joystick pads
-    [mSlider, dSlider].forEach(s => {
-        s.addEventListener('touchstart', (e) => e.stopPropagation());
-        s.addEventListener('mousedown', (e) => e.stopPropagation());
-    });
-
-    // Start Button Event
-    startBtn.addEventListener('click', startGame);
+        document.getElementById('drill-sens-val').innerText = e.target.value + '%';
+    };
 
     function startGame() {
         gameActive = true;
-        startScreen.style.display = 'none';
-        score = 0;
-        scoreDisplay.innerText = `Cavities Cleared: ${score}`;
-        
-        tooth.x = canvas.width / 2;
-        tooth.y = canvas.height / 2;
-        mirror.x = canvas.width / 2;
-        mirror.y = canvas.height / 2;
-        drillInput.x = canvas.width / 2 + 100;
-        drillInput.y = canvas.height / 2;
-
-        generateCavities();
+        document.getElementById('start-screen').style.display = 'none';
+        resize();
+        mirror.x = canvas.width / 2; mirror.y = canvas.height / 2;
+        drillInput.x = canvas.width / 2 + 40; drillInput.y = canvas.height / 2 + 40;
         requestAnimationFrame(update);
     }
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
 
     function update() {
         if (!gameActive) return;
 
-        // Apply joystick velocities with sensitivity
         if (joysticks.mirror.active) {
             mirror.x += joysticks.mirror.dX * (mirror.baseSpeed * mirrorSens);
             mirror.y += joysticks.mirror.dY * (mirror.baseSpeed * mirrorSens);
         }
-
-        mirror.x = Math.max(mirror.radius, Math.min(canvas.width - mirror.radius, mirror.x));
-        mirror.y = Math.max(mirror.radius, Math.min(canvas.height - mirror.radius, mirror.y));
-
         if (joysticks.drill.active) {
             drillInput.x += joysticks.drill.dX * (drillInput.baseSpeed * drillSens);
             drillInput.y += joysticks.drill.dY * (drillInput.baseSpeed * drillSens);
         }
         drillInput.isDrilling = joysticks.drill.active;
 
-        const drillRenderX = tooth.x - (drillInput.x - tooth.x);
-        const drillRenderY = tooth.y - (drillInput.y - tooth.y);
+        const dRX = (canvas.width / 2) - (drillInput.x - (canvas.width / 2));
+        const dRY = (canvas.height / 2) - (drillInput.y - (canvas.height / 2));
 
-        let allCleared = true;
-        const isoSquash = 0.6; 
-        
-        tooth.cavities.forEach(c => {
-            if(!c.cleared) {
-                const cx = tooth.x + c.relX;
-                const cy = tooth.y + (c.relY * isoSquash) - 40; 
-                
-                const distToMirror = Math.hypot(drillRenderX - mirror.x, drillRenderY - mirror.y);
-                const distToCavity = Math.hypot(drillRenderX - cx, drillRenderY - cy);
-
-                if (distToMirror < mirror.radius && distToCavity < c.radius && drillInput.isDrilling) {
-                    c.health -= 2.0;
-                    if(c.health <= 0) {
-                        c.cleared = true;
-                        score++;
-                        scoreDisplay.innerText = `Cavities Cleared: ${score}`;
+        let currentCavities = 0;
+        arch.teeth.forEach(tooth => {
+            tooth.cavities.forEach(c => {
+                if (!c.cleared) {
+                    currentCavities++;
+                    const distMirror = Math.hypot(dRX - mirror.x, dRY - mirror.y);
+                    const distDrill = Math.hypot(dRX - tooth.x, dRY - tooth.y);
+                    if (distMirror < mirror.radius && distDrill < c.radius + 8 && drillInput.isDrilling) {
+                        c.health -= 1.8;
+                        createParticles(dRX, dRY);
+                        if (c.health <= 0) {
+                            c.cleared = true; score++;
+                            document.getElementById('score-display').innerText = `Cavities Cleared: ${score}`;
+                        }
                     }
-                    createParticles(drillRenderX, drillRenderY);
                 }
-                allCleared = false;
-            }
+            });
         });
 
-        if(allCleared) generateCavities();
-
-        draw(drillRenderX, drillRenderY);
-        updateParticles();
+        if (currentCavities === 0) generateCavities();
+        draw(dRX, dRY);
         requestAnimationFrame(update);
     }
 
-    // --- Drawing Functions ---
-    const isoScaleY = 0.6;
-    const toothHeight = 40;
-
-    function draw(drX, drY) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        ctx.globalAlpha = 0.1;
-        drawToothIso(ctx, tooth.x, tooth.y, false);
-        ctx.globalAlpha = 1.0;
-
-        drawDrillIso(ctx, drillInput.x, drillInput.y);
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
-        ctx.clip();
-
-        ctx.fillStyle = '#151212';
-        ctx.fillRect(0,0, canvas.width, canvas.height);
-        
-        drawToothIso(ctx, tooth.x, tooth.y, true);
-        drawParticles(ctx);
-        drawDrillIso(ctx, drX, drY);
-
-        ctx.restore();
-
-        ctx.strokeStyle = '#aab2b8';
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(mirror.x, mirror.y, mirror.radius - 5, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const targetX = -100; 
-        const targetY = canvas.height + 100;
-        const angle = Math.atan2(targetY - mirror.y, targetX - mirror.x);
-        
-        const handleStartX = mirror.x + Math.cos(angle) * (mirror.radius + 2);
-        const handleStartY = mirror.y + Math.sin(angle) * (mirror.radius + 2);
-        
-        ctx.beginPath();
-        ctx.moveTo(handleStartX, handleStartY);
-        ctx.lineTo(handleStartX + Math.cos(angle) * 1000, handleStartY + Math.sin(angle) * 1000); 
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 14;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-    }
-
-    function drawMolarPath(context, x, y) {
-        context.beginPath();
-        context.moveTo(x - 50, y - 60 * isoScaleY);
-        context.quadraticCurveTo(x, y - 75 * isoScaleY, x + 50, y - 60 * isoScaleY);
-        context.quadraticCurveTo(x + 65, y, x + 50, y + 60 * isoScaleY);
-        context.quadraticCurveTo(x, y + 75 * isoScaleY, x - 50, y + 60 * isoScaleY);
-        context.quadraticCurveTo(x - 65, y, x - 50, y - 60 * isoScaleY);
-        context.closePath();
-    }
-
-    function drawFissures(context, x, y, isBright) {
-        context.beginPath();
-        context.moveTo(x - 35, y);
-        context.lineTo(x + 35, y);
-        context.moveTo(x, y - 40 * isoScaleY);
-        context.lineTo(x, y + 40 * isoScaleY);
-        
-        context.moveTo(x - 15, y);
-        context.lineTo(x - 30, y - 30 * isoScaleY);
-        context.moveTo(x + 15, y);
-        context.lineTo(x + 30, y + 30 * isoScaleY);
-
-        context.strokeStyle = isBright ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.5)';
-        context.lineWidth = 3;
-        context.lineCap = 'round';
-        context.stroke();
-    }
-
-    function drawToothIso(context, x, y, isBright) {
-        context.fillStyle = isBright ? '#a3a3a3' : '#333';
-        drawMolarPath(context, x, y);
-        context.fill();
-
-        if (isBright) {
-            context.fillStyle = '#8f8f8f';
-            context.beginPath();
-            context.moveTo(x - 60, y + 10 * isoScaleY);
-            context.lineTo(x + 60, y + 10 * isoScaleY);
-            context.lineTo(x + 60, y - toothHeight + 10 * isoScaleY);
-            context.lineTo(x - 60, y - toothHeight + 10 * isoScaleY);
-            context.fill();
+    function drawTooth(c, x, y, type, isBright, cavities) {
+        c.save(); c.translate(x, y);
+        c.fillStyle = isBright ? '#f8f8f8' : '#2a2a2a';
+        c.beginPath();
+        if (type === "anterior") {
+            c.moveTo(-15, -22); c.quadraticCurveTo(0, -28, 15, -22);
+            c.lineTo(12, 18); c.quadraticCurveTo(0, 24, -12, 18);
+        } else {
+            const size = type === "molar" ? 22 : 18;
+            c.roundRect(-size, -size, size*2, size*2, 8);
         }
+        c.fill();
+        c.strokeStyle = isBright ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
+        c.stroke();
 
-        context.fillStyle = isBright ? '#fcfcfc' : '#555';
-        drawMolarPath(context, x, y - toothHeight);
-        context.fill();
-
-        drawFissures(context, x, y - toothHeight, isBright);
-
-        tooth.cavities.forEach(c => {
-            if(!c.cleared) {
-                context.fillStyle = isBright ? `rgba(60, 30, 10, ${c.health/100})` : '#222';
-                const cavX = x + c.relX;
-                const cavY = y + (c.relY * isoScaleY) - toothHeight;
-                context.beginPath();
-                context.ellipse(cavX, cavY, c.radius, c.radius * isoScaleY, 0, 0, Math.PI*2);
-                context.fill();
+        cavities.forEach(cav => {
+            if (!cav.cleared) {
+                c.fillStyle = isBright ? `rgba(60, 30, 10, ${cav.health/100})` : '#111';
+                c.beginPath(); c.moveTo(cav.points[0].x, cav.points[0].y);
+                cav.points.forEach(p => c.lineTo(p.x, p.y));
+                c.closePath(); c.fill();
             }
         });
+        c.restore();
     }
 
-    function drawDrillIso(context, x, y) {
-        context.save();
-        context.translate(x, y);
-        context.rotate(-Math.PI / 8); 
-
-        context.fillStyle = '#555';
-        context.fillRect(-7, -140, 14, 120);
+    function draw(dRX, dRY) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, false, t.cavities));
         
-        const hg = context.createLinearGradient(-12, -20, 12, -20);
-        hg.addColorStop(0, '#888'); hg.addColorStop(0.5, '#eee'); hg.addColorStop(1, '#888');
-        context.fillStyle = hg;
-        
-        context.beginPath();
-        context.moveTo(-10, -20); 
-        context.lineTo(10, -20);
-        context.lineTo(2, 0); 
-        context.lineTo(-2, 0);
-        context.closePath();
-        context.fill();
+        ctx.save();
+        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = '#1e1b1b'; ctx.fillRect(0,0, canvas.width, canvas.height);
+        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, true, t.cavities));
+        drawDrill(ctx, dRX, dRY);
+        updateParticles(); drawParticles(ctx);
+        ctx.restore();
 
-        if(drillInput.isDrilling) {
-            context.strokeStyle = 'rgba(255,255,255,0.7)';
-            context.lineWidth = 1.5;
-            context.beginPath();
-            context.ellipse(0, -10, 10, 4, 0, 0, Math.PI*2);
-            context.stroke();
+        ctx.strokeStyle = '#999'; ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.stroke();
+        drawDrill(ctx, drillInput.x, drillInput.y);
+    }
+
+    function drawDrill(c, x, y) {
+        c.save(); c.translate(x, y); c.rotate(-Math.PI/4);
+        c.fillStyle = '#444'; c.fillRect(-4, -90, 8, 80);
+        c.fillStyle = '#bbb';
+        c.beginPath(); c.moveTo(-10, -10); c.lineTo(10, -10); c.lineTo(0, 8); c.fill();
+        if (drillInput.isDrilling) {
+            c.strokeStyle = 'rgba(255,255,255,0.6)'; c.beginPath(); c.arc(0,0, 14, 0, Math.PI*2); c.stroke();
         }
-        context.restore();
+        c.restore();
     }
 
     let particles = [];
     function createParticles(x, y) {
-        for(let i=0; i<3; i++) {
-            particles.push({
-                x: x, 
-                y: y - 5,
-                vx: (Math.random()-0.5) * 8,
-                vy: (Math.random()-0.5) * 8 - 2,
-                life: 1.0,
-                size: Math.random() * 3 + 1
-            });
-        }
+        for(let i=0; i<2; i++) particles.push({x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, l:1});
     }
     function updateParticles() {
-        particles.forEach(p => { 
-            p.x += p.vx; 
-            p.y += p.vy; 
-            p.vy += 0.2; 
-            p.life -= 0.05; 
-        });
-        particles = particles.filter(p => p.life > 0);
+        particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.l-=0.06; });
+        particles = particles.filter(p => p.l > 0);
     }
-    function drawParticles(context) {
-        particles.forEach(p => {
-            context.globalAlpha = p.life;
-            context.fillStyle = '#fff';
-            context.beginPath(); 
-            context.arc(p.x, p.y, p.size, 0, Math.PI*2); 
-            context.fill();
-        });
-        context.globalAlpha = 1.0;
+    function drawParticles(c) {
+        particles.forEach(p => { c.fillStyle=`rgba(255,255,255,${p.l})`; c.fillRect(p.x, p.y, 2, 2); });
     }
+
+    function resize() {
+        canvas.width = viewport.clientWidth;
+        canvas.height = viewport.clientHeight;
+        initArch();
+    }
+    window.addEventListener('resize', resize);
+    resize();
 </script>
 </body>
 </html>
