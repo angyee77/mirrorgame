@@ -125,7 +125,6 @@
             padding: 30px 40px;
             border-radius: 16px;
             text-align: center;
-            display: none;
             border: 2px solid var(--accent-color);
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
             z-index: 20;
@@ -191,7 +190,17 @@
     const ctx = canvas.getContext('2d');
     const viewport = document.getElementById('viewport');
     
-    // Resize canvas dynamically and keep tooth centered
+    // --- 1. INITIALIZE STATE VARIABLES FIRST ---
+    let gameActive = false;
+    let score = 0;
+
+    const tooth = {
+        x: 0, 
+        y: 0,
+        cavities: []
+    };
+
+    // --- 2. SET UP RESPONSIVE CANVAS ---
     function resizeCanvas() {
         const rect = viewport.getBoundingClientRect();
         canvas.width = rect.width;
@@ -203,13 +212,10 @@
         }
     }
     window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    resizeCanvas(); // Safe to call now
 
     const scoreDisplay = document.getElementById('score-display');
     const startScreen = document.getElementById('start-screen');
-
-    let gameActive = false;
-    let score = 0;
 
     // Joysticks State
     const joysticks = {
@@ -232,19 +238,12 @@
         isDrilling: false
     };
 
-    // Tooth State
-    const tooth = {
-        x: 0, 
-        y: 0,
-        cavities: []
-    };
-
     function generateCavities() {
         tooth.cavities = [];
         for(let i = 0; i < 5; i++) {
             tooth.cavities.push({
-                relX: (Math.random() - 0.5) * 70, // Constrained X for molar shape
-                relY: (Math.random() - 0.5) * 80, // Constrained Y for molar shape
+                relX: (Math.random() - 0.5) * 70, // Constrained to molar size
+                relY: (Math.random() - 0.5) * 80, // Constrained to molar size
                 radius: 8 + Math.random() * 6,
                 health: 100,
                 cleared: false
@@ -423,7 +422,7 @@
         ctx.arc(mirror.x, mirror.y, mirror.radius - 5, 0, Math.PI * 2);
         ctx.stroke();
 
-        // --- NEW: Dynamic Mirror Handle ---
+        // --- Dynamic Mirror Handle ---
         // Angle points towards the bottom-left corner of the canvas
         const targetX = -100; 
         const targetY = canvas.height + 100;
@@ -511,7 +510,7 @@
         context.save();
         context.translate(x, y);
         
-        // --- NEW: Draw Drill Shadow ---
+        // --- Drill Shadow for Depth ---
         context.fillStyle = 'rgba(0, 0, 0, 0.4)';
         context.beginPath();
         context.ellipse(0, 20, 8, 4, 0, 0, Math.PI*2); 
