@@ -59,3 +59,529 @@
 
         /* Virtual Joystick Base */
         .joystick-base {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .joystick-knob {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease-out;
+        }
+
+        #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
+        #drill-pad .joystick-knob { background: var(--drill-color); box-shadow: 0 0 15px var(--drill-color); }
+
+        /* Central Viewport */
+        #viewport {
+            width: 60%;
+            height: 100%;
+            position: relative;
+            background: radial-gradient(circle at center, #201010 0%, #050505 100%);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stats {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .msg-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 10, 15, 0.95);
+            padding: 30px 40px;
+            border-radius: 16px;
+            text-align: center;
+            display: none;
+            border: 2px solid var(--accent-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            z-index: 20;
+            width: 80%;
+            max-width: 400px;
+        }
+
+        .msg-box h2 { margin-top: 0; color: #fff; }
+        .msg-box p { color: #bbb; line-height: 1.5; }
+
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: transform 0.1s;
+        }
+        
+        .btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+<div id="game-interface">
+    <div class="control-panel" id="mirror-pad">
+        <div class="panel-label">Mirror<br>Pad</div>
+        <div class="joystick-base" id="mirror-base">
+            <div class="joystick-knob" id="mirror-knob"></div>
+        </div>
+    </div>
+
+    <div id="viewport">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div class="ui-overlay">
+            <div class="stats" id="score-display">Cavities Cleared: 0</div>
+            <div style="font-size: 0.8rem; opacity: 0.7;">Isometric Surgery V2</div>
+        </div>
+
+        <div class="msg-box" id="start-screen" style="display: block;">
+            <h2>Dental Operation</h2>
+            <p><b>Left Pad:</b> Guide the Mirror<br><b>Right Pad:</b> Guide the Drill</p>
+            <p style="font-size: 0.9rem; color: #888;">Note: The drill's movement is inverted inside the reflection!</p>
+            <button class="btn" onclick="startGame()">Commence</button>
+        </div>
+    </div>
+
+    <div class="control-panel" id="drill-pad">
+        <div class="panel-label">Drill<br>Pad</div>
+        <div class="joystick-base" id="drill-base">
+            <div class="joystick-knob" id="drill-knob"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const viewport = document.getElementById('viewport');
+    
+    // Resize canvas dynamically and keep tooth centered
+    function resizeCanvas() {
+        const rect = viewport.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        
+        if (gameActive) {
+            tooth.x = canvas.width / 2;
+            tooth.y = canvas.height / 2;
+        }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const scoreDisplay = document.getElementById('score-display');
+    const startScreen = document.getElementById('start-screen');
+
+    let gameActive = false;
+    let score = 0;
+
+    // Joysticks State
+    const joysticks = {
+        mirror: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 },
+        drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
+    };
+
+    // Simulation Objects
+    const mirror = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 65, // Shrunk to match molar size
+        speed: 5
+    };
+
+    const drillInput = {
+        x: canvas.width / 2 + 100,
+        y: canvas.height / 2,
+        speed: 6,
+        isDrilling: false
+    };
+
+    // Tooth State
+    const tooth = {
+        x: 0, 
+        y: 0,
+        cavities: []
+    };
+
+    function generateCavities() {
+        tooth.cavities = [];
+        for(let i = 0; i < 5; i++) {
+            tooth.cavities.push({
+                relX: (Math.random() - 0.5) * 70, // Constrained X for molar shape
+                relY: (Math.random() - 0.5) * 80, // Constrained Y for molar shape
+                radius: 8 + Math.random() * 6,
+                health: 100,
+                cleared: false
+            });
+        }
+    }
+
+    // --- Virtual Joystick Implementation ---
+    function setupJoystick(padId, baseId, knobId, stickData) {
+        const pad = document.getElementById(padId);
+        const base = document.getElementById(baseId);
+        const knob = document.getElementById(knobId);
+
+        pad.addEventListener('pointerdown', (e) => {
+            if (!gameActive) return;
+            stickData.id = e.pointerId;
+            stickData.active = true;
+            pad.setPointerCapture(e.pointerId);
+            updateJoystick(e, base, knob, stickData);
+        });
+
+        pad.addEventListener('pointermove', (e) => {
+            if (stickData.id === e.pointerId && stickData.active) {
+                updateJoystick(e, base, knob, stickData);
+            }
+        });
+
+        const resetJoystick = (e) => {
+            if (stickData.id === e.pointerId) {
+                stickData.active = false;
+                stickData.id = null;
+                stickData.dX = 0;
+                stickData.dY = 0;
+                knob.style.transform = `translate(-50%, -50%)`;
+            }
+        };
+
+        pad.addEventListener('pointerup', resetJoystick);
+        pad.addEventListener('pointercancel', resetJoystick);
+    }
+
+    function updateJoystick(e, base, knob, stickData) {
+        const rect = base.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = e.clientX - centerX;
+        let dy = e.clientY - centerY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > stickData.maxDist) {
+            dx = (dx / dist) * stickData.maxDist;
+            dy = (dy / dist) * stickData.maxDist;
+        }
+
+        // Normalize output from -1.0 to 1.0
+        stickData.dX = dx / stickData.maxDist;
+        stickData.dY = dy / stickData.maxDist;
+
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+
+    setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
+    setupJoystick('drill-pad', 'drill-base', 'drill-knob', joysticks.drill);
+
+    function startGame() {
+        gameActive = true;
+        startScreen.style.display = 'none';
+        score = 0;
+        scoreDisplay.innerText = `Cavities Cleared: ${score}`;
+        
+        tooth.x = canvas.width / 2;
+        tooth.y = canvas.height / 2;
+        mirror.x = canvas.width / 2;
+        mirror.y = canvas.height / 2;
+        drillInput.x = canvas.width / 2 + 100;
+        drillInput.y = canvas.height / 2;
+
+        generateCavities();
+        requestAnimationFrame(update);
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        // Apply joystick velocities
+        if (joysticks.mirror.active) {
+            mirror.x += joysticks.mirror.dX * mirror.speed;
+            mirror.y += joysticks.mirror.dY * mirror.speed;
+        }
+
+        // Clamp mirror inside viewport
+        mirror.x = Math.max(mirror.radius, Math.min(canvas.width - mirror.radius, mirror.x));
+        mirror.y = Math.max(mirror.radius, Math.min(canvas.height - mirror.radius, mirror.y));
+
+        if (joysticks.drill.active) {
+            drillInput.x += joysticks.drill.dX * drillInput.speed;
+            drillInput.y += joysticks.drill.dY * drillInput.speed;
+        }
+        drillInput.isDrilling = joysticks.drill.active;
+
+        // Reflected Rendering Math
+        const drillRenderX = tooth.x - (drillInput.x - tooth.x);
+        const drillRenderY = tooth.y - (drillInput.y - tooth.y);
+
+        let allCleared = true;
+        const isoSquash = 0.6; 
+        
+        tooth.cavities.forEach(c => {
+            if(!c.cleared) {
+                const cx = tooth.x + c.relX;
+                const cy = tooth.y + (c.relY * isoSquash) - 40; 
+                
+                const distToMirror = Math.hypot(drillRenderX - mirror.x, drillRenderY - mirror.y);
+                const distToCavity = Math.hypot(drillRenderX - cx, drillRenderY - cy);
+
+                if (distToMirror < mirror.radius && distToCavity < c.radius && drillInput.isDrilling) {
+                    c.health -= 2.0;
+                    if(c.health <= 0) {
+                        c.cleared = true;
+                        score++;
+                        scoreDisplay.innerText = `Cavities Cleared: ${score}`;
+                    }
+                    createParticles(drillRenderX, drillRenderY);
+                }
+                allCleared = false;
+            }
+        });
+
+        if(allCleared) generateCavities();
+
+        draw(drillRenderX, drillRenderY);
+        updateParticles();
+        requestAnimationFrame(update);
+    }
+
+    // --- Isometric Drawing Functions ---
+    const isoScaleY = 0.6;
+    const toothHeight = 40;
+
+    function draw(drX, drY) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Real World (Dimmed Mouth)
+        ctx.globalAlpha = 0.1;
+        drawToothIso(ctx, tooth.x, tooth.y, false);
+        ctx.globalAlpha = 1.0;
+
+        // 2. Mirror Reflection
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
+        ctx.clip();
+
+        // Bright mirror background
+        ctx.fillStyle = '#151212';
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        
+        // Draw bright tooth and components inside mirror
+        drawToothIso(ctx, tooth.x, tooth.y, true);
+        drawParticles(ctx);
+        drawDrillIso(ctx, drX, drY);
+
+        ctx.restore();
+
+        // 3. Mirror Frame overlay
+        ctx.strokeStyle = '#aab2b8';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(mirror.x, mirror.y, mirror.radius - 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // --- NEW: Dynamic Mirror Handle ---
+        // Angle points towards the bottom-left corner of the canvas
+        const targetX = -100; 
+        const targetY = canvas.height + 100;
+        const angle = Math.atan2(targetY - mirror.y, targetX - mirror.x);
+        
+        // Start handle exactly at the edge of the mirror
+        const handleStartX = mirror.x + Math.cos(angle) * (mirror.radius + 2);
+        const handleStartY = mirror.y + Math.sin(angle) * (mirror.radius + 2);
+        
+        ctx.beginPath();
+        ctx.moveTo(handleStartX, handleStartY);
+        // Draw a long line off-screen
+        ctx.lineTo(handleStartX + Math.cos(angle) * 1000, handleStartY + Math.sin(angle) * 1000); 
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 14;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+    }
+
+    // --- Organic Molar Shape ---
+    function drawMolarPath(context, x, y) {
+        context.beginPath();
+        context.moveTo(x - 50, y - 60 * isoScaleY);
+        context.quadraticCurveTo(x, y - 75 * isoScaleY, x + 50, y - 60 * isoScaleY);
+        context.quadraticCurveTo(x + 65, y, x + 50, y + 60 * isoScaleY);
+        context.quadraticCurveTo(x, y + 75 * isoScaleY, x - 50, y + 60 * isoScaleY);
+        context.quadraticCurveTo(x - 65, y, x - 50, y - 60 * isoScaleY);
+        context.closePath();
+    }
+
+    // --- Fissures (Grooves) ---
+    function drawFissures(context, x, y, isBright) {
+        context.beginPath();
+        context.moveTo(x - 35, y);
+        context.lineTo(x + 35, y);
+        context.moveTo(x, y - 40 * isoScaleY);
+        context.lineTo(x, y + 40 * isoScaleY);
+        
+        context.moveTo(x - 15, y);
+        context.lineTo(x - 30, y - 30 * isoScaleY);
+        context.moveTo(x + 15, y);
+        context.lineTo(x + 30, y + 30 * isoScaleY);
+
+        context.strokeStyle = isBright ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.5)';
+        context.lineWidth = 3;
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.stroke();
+    }
+
+    function drawToothIso(context, x, y, isBright) {
+        context.fillStyle = isBright ? '#a3a3a3' : '#333';
+        drawMolarPath(context, x, y);
+        context.fill();
+
+        if (isBright) {
+            context.fillStyle = '#8f8f8f';
+            context.beginPath();
+            context.moveTo(x - 60, y + 10 * isoScaleY);
+            context.lineTo(x + 60, y + 10 * isoScaleY);
+            context.lineTo(x + 60, y - toothHeight + 10 * isoScaleY);
+            context.lineTo(x - 60, y - toothHeight + 10 * isoScaleY);
+            context.fill();
+        }
+
+        context.fillStyle = isBright ? '#fcfcfc' : '#555';
+        drawMolarPath(context, x, y - toothHeight);
+        context.fill();
+
+        drawFissures(context, x, y - toothHeight, isBright);
+
+        tooth.cavities.forEach(c => {
+            if(!c.cleared) {
+                context.fillStyle = isBright ? `rgba(60, 30, 10, ${c.health/100})` : '#222';
+                const cavX = x + c.relX;
+                const cavY = y + (c.relY * isoScaleY) - toothHeight;
+                context.beginPath();
+                context.ellipse(cavX, cavY, c.radius, c.radius * isoScaleY, 0, 0, Math.PI*2);
+                context.fill();
+            }
+        });
+    }
+
+    function drawDrillIso(context, x, y) {
+        context.save();
+        context.translate(x, y);
+        
+        // --- NEW: Draw Drill Shadow ---
+        context.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        context.beginPath();
+        context.ellipse(0, 20, 8, 4, 0, 0, Math.PI*2); 
+        context.fill();
+        
+        // Tilt drill
+        context.rotate(-Math.PI / 8); 
+
+        // Handle
+        context.fillStyle = '#555';
+        context.fillRect(-7, -140, 14, 120);
+        
+        // Head / Shaft
+        const hg = context.createLinearGradient(-12, -20, 12, -20);
+        hg.addColorStop(0, '#888'); hg.addColorStop(0.5, '#eee'); hg.addColorStop(1, '#888');
+        context.fillStyle = hg;
+        
+        context.beginPath();
+        context.moveTo(-10, -20); 
+        context.lineTo(10, -20);
+        context.lineTo(2, 0); 
+        context.lineTo(-2, 0);
+        context.closePath();
+        context.fill();
+
+        if(drillInput.isDrilling) {
+            context.strokeStyle = 'rgba(255,255,255,0.7)';
+            context.lineWidth = 1.5;
+            context.beginPath();
+            context.ellipse(0, -10, 10, 4, 0, 0, Math.PI*2);
+            context.stroke();
+        }
+
+        context.restore();
+    }
+
+    // --- Particle System ---
+    let particles = [];
+    function createParticles(x, y) {
+        for(let i=0; i<3; i++) {
+            particles.push({
+                x: x, 
+                y: y - 5,
+                vx: (Math.random()-0.5) * 8,
+                vy: (Math.random()-0.5) * 8 - 2,
+                life: 1.0,
+                size: Math.random() * 3 + 1
+            });
+        }
+    }
+    function updateParticles() {
+        particles.forEach(p => { 
+            p.x += p.vx; 
+            p.y += p.vy; 
+            p.vy += 0.2; 
+            p.life -= 0.05; 
+        });
+        particles = particles.filter(p => p.life > 0);
+    }
+    function drawParticles(context) {
+        particles.forEach(p => {
+            context.globalAlpha = p.life;
+            context.fillStyle = '#fff';
+            context.beginPath(); 
+            context.arc(p.x, p.y, p.size, 0, Math.PI*2); 
+            context.fill();
+        });
+        context.globalAlpha = 1.0;
+    }
+
+</script>
+</body>
+</html>
