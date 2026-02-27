@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Mirror Challenge - Upper Arch Edition</title>
+    <title>Dental Indirect Vision Trainer</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -14,147 +14,87 @@
         }
 
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             background-color: var(--bg-color);
             color: #e5e7eb;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
             touch-action: none; 
-            user-select: none; 
+            user-select: none;
             -webkit-user-select: none;
         }
 
-        #game-interface {
-            display: flex;
-            width: 100vw;
-            height: 100vh;
-        }
+        #game-interface { display: flex; width: 100vw; height: 100vh; }
 
         .control-panel {
-            width: 20%;
-            height: 100%;
+            width: 20%; height: 100%;
             background: var(--pad-bg);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            z-index: 10;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative; z-index: 10;
         }
 
         .settings-container {
-            position: absolute;
-            top: 20px;
-            width: 85%;
-            text-align: center;
-            z-index: 25;
+            position: absolute; top: 20px;
+            width: 85%; text-align: center;
         }
 
         .panel-label {
-            font-size: 0.75rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-            margin-bottom: 8px;
+            font-size: 0.75rem; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 1px;
+            color: #888; margin-bottom: 8px;
         }
 
-        .sensitivity-slider {
-            width: 100%;
-            cursor: pointer;
-            accent-color: var(--accent-color);
-        }
-
-        .sensitivity-value {
-            font-size: 0.7rem;
-            color: var(--accent-color);
-            margin-top: 4px;
-        }
+        .sensitivity-slider { width: 100%; cursor: pointer; accent-color: var(--accent-color); }
+        .sensitivity-value { font-size: 0.7rem; color: var(--accent-color); margin-top: 4px; }
 
         .joystick-base {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.05);
+            width: 100px; height: 100px;
+            border-radius: 50%; background: rgba(255,255,255,0.05);
             border: 2px solid rgba(255,255,255,0.1);
-            position: relative;
-            margin-top: 60px;
-            pointer-events: none; /* Let the pad handle events */
+            position: relative; margin-top: 60px;
         }
 
         .joystick-knob {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
+            width: 40px; height: 40px;
+            border-radius: 50%; position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
         }
 
         #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
         #drill-pad .joystick-knob { background: var(--drill-color); box-shadow: 0 0 15px var(--drill-color); }
 
         #viewport {
-            width: 60%;
-            height: 100%;
+            width: 60%; height: 100%;
             position: relative;
-            background: radial-gradient(circle at center, #2a1515 0%, #050505 100%);
+            background: radial-gradient(circle at center, #2a1212 0%, #050505 100%);
             overflow: hidden;
         }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
+        canvas { display: block; width: 100%; height: 100%; }
 
         .ui-overlay {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            pointer-events: none;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 12px 20px;
-            border-radius: 12px;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 15;
+            position: absolute; top: 20px; left: 20px;
+            pointer-events: none; background: rgba(0, 0, 0, 0.7);
+            padding: 12px 20px; border-radius: 12px;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .stats { font-size: 1.1rem; font-weight: bold; color: #fff; }
-
         .msg-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
+            position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(10, 10, 15, 0.95);
-            padding: 30px 40px;
-            border-radius: 16px;
-            text-align: center;
-            border: 2px solid var(--accent-color);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            z-index: 100;
-            width: 80%;
-            max-width: 400px;
+            padding: 30px 40px; border-radius: 16px;
+            text-align: center; border: 2px solid var(--accent-color);
+            z-index: 100; width: 80%; max-width: 400px;
         }
 
         .btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 15px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            pointer-events: auto;
+            background: var(--accent-color); color: white;
+            border: none; padding: 14px 28px;
+            border-radius: 8px; cursor: pointer;
+            margin-top: 15px; font-weight: bold; font-size: 1.1rem;
         }
     </style>
 </head>
@@ -174,11 +114,11 @@
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
             <div class="stats" id="score-display">Cavities Cleared: 0</div>
-            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Arch V3.1</div>
+            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Upper Arch V4</div>
         </div>
         <div class="msg-box" id="start-screen">
-            <h2>Upper Arch Training</h2>
-            <p>Guide the mirror to see the reflection.<br>Drill the irregular cavities.</p>
+            <h2>Dental Indirect Vision</h2>
+            <p>Use the mirror to visualize the upper arch.<br>The reflection inverts your drill movement!</p>
             <button id="start-btn" class="btn">Commence</button>
         </div>
     </div>
@@ -210,21 +150,21 @@
     };
 
     const mirror = { x: 0, y: 0, radius: 95, baseSpeed: 5 };
-    const drillInput = { x: 0, y: 0, baseSpeed: 6, isDrilling: false };
+    const drillPhys = { x: 0, y: 0, baseSpeed: 6, isDrilling: false };
 
     function initArch() {
         arch.teeth = [];
         const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2 + 60;
-        const a = canvas.width * 0.25; 
-        const b = canvas.height * 0.35; 
+        const centerY = canvas.height / 2 + 80;
+        const a = canvas.width * 0.28; 
+        const b = canvas.height * 0.4; 
 
         for (let i = 0; i < 14; i++) {
             const t = (i / 13) * Math.PI - Math.PI; 
             const tx = centerX + a * Math.cos(t);
             const ty = centerY + b * Math.sin(t);
             let type = (i >= 5 && i <= 8) ? "anterior" : (i === 4 || i === 9 || i === 3 || i === 10) ? "premolar" : "molar";
-            arch.teeth.push({ x: tx, y: ty, type: type, cavities: [] });
+            arch.teeth.push({ x: tx, y: ty, type, cavities: [] });
         }
         generateCavities();
     }
@@ -234,10 +174,9 @@
         for (let i = 0; i < 2; i++) {
             const randomTooth = arch.teeth[Math.floor(Math.random() * arch.teeth.length)];
             const points = [];
-            const numPoints = 10;
             const baseRad = 10 + Math.random() * 8;
-            for (let p = 0; p < numPoints; p++) {
-                const angle = (p / numPoints) * Math.PI * 2;
+            for (let p = 0; p < 8; p++) {
+                const angle = (p / 8) * Math.PI * 2;
                 const r = baseRad * (0.6 + Math.random() * 0.8);
                 points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
             }
@@ -245,6 +184,7 @@
         }
     }
 
+    // --- JOYSTICK LOGIC ---
     function updateJoystick(clientPos, base, knob, stickData) {
         const rect = base.getBoundingClientRect();
         const dx = clientPos.clientX - (rect.left + rect.width / 2);
@@ -263,7 +203,7 @@
         const base = document.getElementById(baseId);
         const knob = document.getElementById(knobId);
 
-        const start = (e) => {
+        const onStart = (e) => {
             if (!gameActive || e.target.type === 'range') return;
             e.preventDefault();
             stickData.active = true;
@@ -272,27 +212,23 @@
             updateJoystick(touch, base, knob, stickData);
         };
 
-        const move = (e) => {
+        const onMove = (e) => {
             if (!stickData.active) return;
-            let touch;
-            if (e.type === 'touchmove') {
-                touch = Array.from(e.changedTouches).find(t => t.identifier === stickData.id);
-            } else { touch = e; }
+            let touch = e.type === 'touchmove' ? Array.from(e.changedTouches).find(t => t.identifier === stickData.id) : e;
             if (touch) updateJoystick(touch, base, knob, stickData);
         };
 
-        const end = () => {
-            stickData.active = false;
-            stickData.dX = 0; stickData.dY = 0;
+        const onEnd = () => {
+            stickData.active = false; stickData.dX = 0; stickData.dY = 0;
             knob.style.transform = `translate(-50%, -50%)`;
         };
 
-        pad.addEventListener('touchstart', start, {passive: false});
-        window.addEventListener('touchmove', move, {passive: false});
-        window.addEventListener('touchend', end);
-        pad.addEventListener('mousedown', start);
-        window.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', end);
+        pad.addEventListener('touchstart', onStart, {passive: false});
+        window.addEventListener('touchmove', onMove, {passive: false});
+        window.addEventListener('touchend', onEnd);
+        pad.addEventListener('mousedown', onStart);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
     }
 
     setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
@@ -312,11 +248,10 @@
         document.getElementById('start-screen').style.display = 'none';
         resize();
         mirror.x = canvas.width / 2; mirror.y = canvas.height / 2;
-        drillInput.x = canvas.width / 2 + 40; drillInput.y = canvas.height / 2 + 40;
+        drillPhys.x = canvas.width / 2 + 50; drillPhys.y = canvas.height / 2 + 100;
         requestAnimationFrame(update);
     }
-
-    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('start-btn').onclick = startGame;
 
     function update() {
         if (!gameActive) return;
@@ -326,24 +261,28 @@
             mirror.y += joysticks.mirror.dY * (mirror.baseSpeed * mirrorSens);
         }
         if (joysticks.drill.active) {
-            drillInput.x += joysticks.drill.dX * (drillInput.baseSpeed * drillSens);
-            drillInput.y += joysticks.drill.dY * (drillInput.baseSpeed * drillSens);
+            drillPhys.x += joysticks.drill.dX * (drillPhys.baseSpeed * drillSens);
+            drillPhys.y += joysticks.drill.dY * (drillPhys.baseSpeed * drillSens);
         }
-        drillInput.isDrilling = joysticks.drill.active;
+        drillPhys.isDrilling = joysticks.drill.active;
 
-        const dRX = (canvas.width / 2) - (drillInput.x - (canvas.width / 2));
-        const dRY = (canvas.height / 2) - (drillInput.y - (canvas.height / 2));
+        // INVERSION LOGIC: Reflected drill moves opposite to physical drill across viewport center
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const drillReflectedX = centerX - (drillPhys.x - centerX);
+        const drillReflectedY = centerY - (drillPhys.y - centerY);
 
-        let currentCavities = 0;
+        let activeCavities = 0;
         arch.teeth.forEach(tooth => {
             tooth.cavities.forEach(c => {
                 if (!c.cleared) {
-                    currentCavities++;
-                    const distMirror = Math.hypot(dRX - mirror.x, dRY - mirror.y);
-                    const distDrill = Math.hypot(dRX - tooth.x, dRY - tooth.y);
-                    if (distMirror < mirror.radius && distDrill < c.radius + 8 && drillInput.isDrilling) {
-                        c.health -= 1.8;
-                        createParticles(dRX, dRY);
+                    activeCavities++;
+                    const dMirror = Math.hypot(drillReflectedX - mirror.x, drillReflectedY - mirror.y);
+                    const dTarget = Math.hypot(drillReflectedX - tooth.x, drillReflectedY - tooth.y);
+                    
+                    if (dMirror < mirror.radius && dTarget < c.radius + 10 && drillPhys.isDrilling) {
+                        c.health -= 1.5;
+                        createParticles(drillReflectedX, drillReflectedY);
                         if (c.health <= 0) {
                             c.cleared = true; score++;
                             document.getElementById('score-display').innerText = `Cavities Cleared: ${score}`;
@@ -353,32 +292,42 @@
             });
         });
 
-        if (currentCavities === 0) generateCavities();
-        draw(dRX, dRY);
+        if (activeCavities === 0) generateCavities();
+        draw(drillReflectedX, drillReflectedY);
         requestAnimationFrame(update);
     }
 
     function drawTooth(c, x, y, type, isBright, cavities) {
         c.save(); c.translate(x, y);
-        c.fillStyle = isBright ? '#f8f8f8' : '#2a2a2a';
+        c.fillStyle = isBright ? '#fcfcfc' : '#222';
+        
         c.beginPath();
         if (type === "anterior") {
-            c.moveTo(-15, -22); c.quadraticCurveTo(0, -28, 15, -22);
-            c.lineTo(12, 18); c.quadraticCurveTo(0, 24, -12, 18);
+            // Palatal surface with marginal ridges
+            c.moveTo(-14, -20); c.bezierCurveTo(-15, -28, 15, -28, 14, -20);
+            c.lineTo(10, 15); c.quadraticCurveTo(0, 22, -10, 15); c.closePath();
+            c.fill();
+            // Ridge details
+            c.strokeStyle = isBright ? '#ddd' : '#111'; c.lineWidth = 1;
+            c.beginPath(); c.moveTo(-10, -18); c.lineTo(-8, 10); c.moveTo(10, -18); c.lineTo(8, 10); c.stroke();
         } else {
-            const size = type === "molar" ? 22 : 18;
-            c.roundRect(-size, -size, size*2, size*2, 8);
+            // Occlusal surface with cusps
+            const s = type === "molar" ? 22 : 18;
+            c.moveTo(-s, -s/2); c.quadraticCurveTo(-s, -s, -s/2, -s);
+            c.quadraticCurveTo(0, -s-4, s/2, -s); c.quadraticCurveTo(s, -s, s, -s/2);
+            c.quadraticCurveTo(s+4, 0, s, s/2); c.quadraticCurveTo(s, s, s/2, s);
+            c.quadraticCurveTo(0, s+4, -s/2, s); c.quadraticCurveTo(-s, s, -s, s/2); c.closePath();
+            c.fill();
+            // Fissures
+            c.strokeStyle = isBright ? '#ccc' : '#111';
+            c.beginPath(); c.moveTo(-s+8, 0); c.lineTo(s-8, 0); c.moveTo(0, -s+8); c.lineTo(0, s-8); c.stroke();
         }
-        c.fill();
-        c.strokeStyle = isBright ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)';
-        c.stroke();
 
         cavities.forEach(cav => {
             if (!cav.cleared) {
-                c.fillStyle = isBright ? `rgba(60, 30, 10, ${cav.health/100})` : '#111';
+                c.fillStyle = isBright ? `rgba(50, 25, 10, ${cav.health/100})` : '#000';
                 c.beginPath(); c.moveTo(cav.points[0].x, cav.points[0].y);
-                cav.points.forEach(p => c.lineTo(p.x, p.y));
-                c.closePath(); c.fill();
+                cav.points.forEach(p => c.lineTo(p.x, p.y)); c.closePath(); c.fill();
             }
         });
         c.restore();
@@ -386,28 +335,36 @@
 
     function draw(dRX, dRY) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // 1. Dark background teeth
         arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, false, t.cavities));
         
+        // 2. Mirror reflection
         ctx.save();
         ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.clip();
-        ctx.fillStyle = '#1e1b1b'; ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = '#181515'; ctx.fillRect(0,0, canvas.width, canvas.height);
         arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, true, t.cavities));
-        drawDrill(ctx, dRX, dRY);
+        drawDrill(ctx, dRX, dRY, true);
         updateParticles(); drawParticles(ctx);
         ctx.restore();
 
+        // 3. Mirror Frame
         ctx.strokeStyle = '#999'; ctx.lineWidth = 10;
         ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.stroke();
-        drawDrill(ctx, drillInput.x, drillInput.y);
+        
+        // 4. Physical Drill (Only visible outside mirror or as shadow)
+        drawDrill(ctx, drillPhys.x, drillPhys.y, false);
     }
 
-    function drawDrill(c, x, y) {
-        c.save(); c.translate(x, y); c.rotate(-Math.PI/4);
-        c.fillStyle = '#444'; c.fillRect(-4, -90, 8, 80);
-        c.fillStyle = '#bbb';
-        c.beginPath(); c.moveTo(-10, -10); c.lineTo(10, -10); c.lineTo(0, 8); c.fill();
-        if (drillInput.isDrilling) {
-            c.strokeStyle = 'rgba(255,255,255,0.6)'; c.beginPath(); c.arc(0,0, 14, 0, Math.PI*2); c.stroke();
+    function drawDrill(c, x, y, reflected) {
+        c.save(); c.translate(x, y);
+        if(reflected) c.scale(-1, 1); // Flip reflection
+        c.rotate(-Math.PI/4);
+        c.fillStyle = reflected ? '#999' : '#333';
+        c.fillRect(-5, -85, 10, 75);
+        c.fillStyle = reflected ? '#eee' : '#555';
+        c.beginPath(); c.moveTo(-10, -10); c.lineTo(10, -10); c.lineTo(0, 10); c.fill();
+        if (drillPhys.isDrilling) {
+            c.strokeStyle = '#fff'; c.beginPath(); c.arc(0,0, 15, 0, Math.PI*2); c.stroke();
         }
         c.restore();
     }
@@ -417,20 +374,15 @@
         for(let i=0; i<2; i++) particles.push({x, y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, l:1});
     }
     function updateParticles() {
-        particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.l-=0.06; });
+        particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.l-=0.05; });
         particles = particles.filter(p => p.l > 0);
     }
     function drawParticles(c) {
         particles.forEach(p => { c.fillStyle=`rgba(255,255,255,${p.l})`; c.fillRect(p.x, p.y, 2, 2); });
     }
 
-    function resize() {
-        canvas.width = viewport.clientWidth;
-        canvas.height = viewport.clientHeight;
-        initArch();
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    function resize() { canvas.width = viewport.clientWidth; canvas.height = viewport.clientHeight; initArch(); }
+    window.onresize = resize; resize();
 </script>
 </body>
 </html>
