@@ -22,6 +22,7 @@
             overflow: hidden;
             touch-action: none; /* Prevents scrolling/zooming */
             user-select: none; /* Prevents accidental text highlighting */
+            -webkit-user-select: none;
         }
 
         /* 3-Panel Layout */
@@ -44,6 +45,7 @@
             position: relative;
             z-index: 10;
             box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            touch-action: none;
         }
 
         .panel-label {
@@ -75,7 +77,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            transition: transform 0.1s ease-out;
+            /* Removed transition so it follows finger instantly */
         }
 
         #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
@@ -252,44 +254,100 @@
         }
     }
 
-    // --- Virtual Joystick Implementation ---
+    // --- BULLETPROOF HYBRID JOYSTICK IMPLEMENTATION ---
+    function updateJoystick(clientPos, base, knob, stickData) {
+        const rect = base.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = clientPos.clientX - centerX;
+        let dy = clientPos.clientY - centerY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > stickData.maxDist) {
+            dx = (dx / dist) * stickData.maxDist;
+            dy = (dy / dist) * stickData.maxDist;
+        }
+
+        stickData.dX = dx / stickData.maxDist;
+        stickData.dY = dy / stickData.maxDist;
+
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+
     function setupJoystick(padId, baseId, knobId, stickData) {
         const pad = document.getElementById(padId);
         const base = document.getElementById(baseId);
         const knob = document.getElementById(knobId);
 
-        pad.addEventListener('pointerdown', (e) => {
+        const startDrag = (e) => {
             if (!gameActive) return;
-            stickData.id = e.pointerId;
+            e.preventDefault();
             stickData.active = true;
-            pad.setPointerCapture(e.pointerId);
-            updateJoystick(e, base, knob, stickData);
-        });
-
-        pad.addEventListener('pointermove', (e) => {
-            if (stickData.id === e.pointerId && stickData.active) {
+            
+            if (e.type === 'touchstart') {
+                stickData.id = e.changedTouches[0].identifier;
+                updateJoystick(e.changedTouches[0], base, knob, stickData);
+            } else {
                 updateJoystick(e, base, knob, stickData);
-            }
-        });
-
-        const resetJoystick = (e) => {
-            if (stickData.id === e.pointerId) {
-                stickData.active = false;
-                stickData.id = null;
-                stickData.dX = 0;
-                stickData.dY = 0;
-                knob.style.transform = `translate(-50%, -50%)`;
             }
         };
 
-        pad.addEventListener('pointerup', resetJoystick);
-        pad.addEventListener('pointercancel', resetJoystick);
+        const moveDrag = (e) => {
+            if (!stickData.active) return;
+            e.preventDefault();
+            
+            if (e.type === 'touchmove') {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === stickData.id) {
+                        updateJoystick(e.changedTouches[i], base, knob, stickData);
+                        break;
+                    }
+                }
+            } else {
+                updateJoystick(e, base, knob, stickData);
+            }
+        };
+
+        const endDrag = (e) => {
+            if (!stickData.active) return;
+            
+            if (e.type.includes('touch')) {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === stickData.id) {
+                        resetStick();
+                        break;
+                    }
+                }
+            } else {
+                resetStick();
+            }
+        };
+
+        const resetStick = () => {
+            stickData.active = false;
+            stickData.id = null;
+            stickData.dX = 0;
+            stickData.dY = 0;
+            knob.style.transform = `translate(-50%, -50%)`;
+        };
+
+        // Touch Listeners (attached to the pad)
+        pad.addEventListener('touchstart', startDrag, {passive: false});
+        pad.addEventListener('touchmove', moveDrag, {passive: false});
+        pad.addEventListener('touchend', endDrag);
+        pad.addEventListener('touchcancel', endDrag);
+
+        // Mouse Listeners (move and up attached to window to prevent drops)
+        pad.addEventListener('mousedown', startDrag);
+        window.addEventListener('mousemove', moveDrag);
+        window.addEventListener('mouseup', endDrag);
     }
 
     setupJoystick('mirror-pad', 'mirror-base', 'mirror-knob', joysticks.mirror);
     setupJoystick('drill-pad', 'drill-base', 'drill-knob', joysticks.drill);
 
-    // Bulletproof event listener attachment
+    // Start Button Event
     startBtn.addEventListener('click', startGame);
 
     function startGame() {
@@ -376,7 +434,6 @@
         ctx.globalAlpha = 1.0;
 
         // Draw the ACTUAL physical drill in the dark mouth space
-        // This lets the player see their hand moving outside the mirror!
         drawDrillIso(ctx, drillInput.x, drillInput.y);
 
         // 2. Mirror Reflection (Clipping Mask)
