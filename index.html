@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Indirect Vision Trainer - Unified</title>
+    <title>Dental Indirect Vision Trainer - Pro V7</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -60,6 +60,7 @@
             width: 40px; height: 40px;
             border-radius: 50%; position: absolute;
             top: 50%; left: 50%; transform: translate(-50%, -50%);
+            transition: background 0.2s;
         }
 
         #mirror-pad .joystick-knob { background: var(--mirror-color); box-shadow: 0 0 15px var(--mirror-color); }
@@ -87,7 +88,7 @@
             background: rgba(10, 10, 15, 0.95);
             padding: 30px 40px; border-radius: 16px;
             text-align: center; border: 2px solid var(--accent-color);
-            z-index: 100; width: 80%; max-width: 400px;
+            z-index: 100; width: 80%; max-width: 450px;
         }
 
         .btn {
@@ -114,11 +115,14 @@
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
             <div class="stats" id="score-display">Cavities Cleared: 0</div>
-            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V6</div>
+            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V7</div>
         </div>
         <div class="msg-box" id="start-screen">
             <h2>Dental Indirect Vision</h2>
-            <p>Drill movement inverts inside the mirror.<br>Only one drill is active at a time.</p>
+            <p style="font-size: 0.95rem; color: #aaa;">
+                1. Drill movement inverts inside the mirror.<br><br>
+                2. <b>Seamless Entry:</b> When crossing the mirror boundary, your drill will pause. Reverse your joystick direction to continue moving inside!
+            </p>
             <button id="start-btn" class="btn">Commence</button>
         </div>
     </div>
@@ -146,35 +150,43 @@
     const arch = { teeth: [] };
     const joysticks = {
         mirror: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 },
-        drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50, inverted: false }
+        drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
     const mirror = { x: 0, y: 0, radius: 100, baseSpeed: 5 };
-    const drill = { x: 0, y: 0, baseSpeed: 6, isDrilling: false };
+    const drill = { x: 0, y: 0, baseSpeed: 6, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
     function initArch() {
         arch.teeth = [];
         const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2 + 80;
-        const a = canvas.width * 0.28; 
-        const b = canvas.height * 0.4; 
+        const centerY = canvas.height * 0.25; // Adjusted higher so the U drops down
+        const a = canvas.width * 0.35; // Arch width
+        const b = canvas.height * 0.5; // Arch depth
 
-        for (let i = 0; i < 14; i++) {
-            const t = (i / 13) * Math.PI - Math.PI; 
+        // Loop generates 16 teeth: from right 3rd molar to left 3rd molar
+        for (let i = 0; i < 16; i++) {
+            // PI to 0 draws the bottom half of the ellipse (U-shape)
+            const t = Math.PI - (i / 15) * Math.PI; 
             const tx = centerX + a * Math.cos(t);
             const ty = centerY + b * Math.sin(t);
-            let type = (i >= 5 && i <= 8) ? "anterior" : (i === 4 || i === 9 || i === 3 || i === 10) ? "premolar" : "molar";
-            arch.teeth.push({ x: tx, y: ty, type, cavities: [] });
+            
+            let type;
+            if (i >= 6 && i <= 9) type = "anterior"; // Incisors (Central & Lateral)
+            else if (i === 5 || i === 10) type = "canine"; // Canines
+            else if (i === 3 || i === 4 || i === 11 || i === 12) type = "premolar"; // Premolars
+            else type = "molar"; // Molars
+            
+            arch.teeth.push({ x: tx, y: ty, type, angle: t, cavities: [] });
         }
         generateCavities();
     }
 
     function generateCavities() {
         arch.teeth.forEach(t => t.cavities = []);
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
             const randomTooth = arch.teeth[Math.floor(Math.random() * arch.teeth.length)];
             const points = [];
-            const baseRad = 10 + Math.random() * 8;
+            const baseRad = (randomTooth.type === 'molar') ? 8 + Math.random() * 4 : 4 + Math.random() * 3;
             for (let p = 0; p < 8; p++) {
                 const angle = (p / 8) * Math.PI * 2;
                 const r = baseRad * (0.6 + Math.random() * 0.8);
@@ -207,12 +219,6 @@
             if (!gameActive || e.target.type === 'range') return;
             e.preventDefault();
             stickData.active = true;
-
-            // FIX: Lock inversion state on touch/click to prevent boundary bounce bug
-            if (stickData === joysticks.drill) {
-                stickData.inverted = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
-            }
-
             const touch = e.type === 'touchstart' ? e.changedTouches[0] : e;
             if (e.type === 'touchstart') stickData.id = touch.identifier;
             updateJoystick(touch, base, knob, stickData);
@@ -262,42 +268,63 @@
     function update() {
         if (!gameActive) return;
 
-        // Determine if drill is inside the mirror boundary (used for clearing logic)
-        const isInsideMirror = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
-
+        // --- MIRROR MOVEMENT ---
         if (joysticks.mirror.active) {
             mirror.x += joysticks.mirror.dX * (mirror.baseSpeed * mirrorSens);
             mirror.y += joysticks.mirror.dY * (mirror.baseSpeed * mirrorSens);
         }
-        
-        if (joysticks.drill.active) {
-            let moveX = joysticks.drill.dX * (drill.baseSpeed * drillSens);
-            let moveY = joysticks.drill.dY * (drill.baseSpeed * drillSens);
 
-            // Use the locked inverted state determined when the user grabbed the joystick
-            if (joysticks.drill.inverted) {
+        // --- SEAMLESS DRILL INVERSION LOGIC ---
+        const isInsideMirror = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
+        if (drill.wasInside === undefined) drill.wasInside = isInsideMirror;
+
+        // If boundary crossed, require user to reverse thumb direction
+        if (isInsideMirror !== drill.wasInside) {
+            drill.waitingForFlip = true;
+            drill.entryX = joysticks.drill.dX;
+            drill.entryY = joysticks.drill.dY;
+        }
+        drill.wasInside = isInsideMirror;
+
+        if (joysticks.drill.active) {
+            if (drill.waitingForFlip) {
+                // Check if user has reversed joystick (Dot Product <= 0)
+                let dot = joysticks.drill.dX * drill.entryX + joysticks.drill.dY * drill.entryY;
+                if (dot <= 0.1) drill.waitingForFlip = false; 
+            }
+
+            let moveX = 0, moveY = 0;
+            // Only move if we aren't blocked at the boundary
+            if (!drill.waitingForFlip) {
+                moveX = joysticks.drill.dX * (drill.baseSpeed * drillSens);
+                moveY = joysticks.drill.dY * (drill.baseSpeed * drillSens);
+            }
+
+            // Apply true dynamic inversion
+            if (isInsideMirror) {
                 drill.x -= moveX;
                 drill.y -= moveY;
             } else {
                 drill.x += moveX;
                 drill.y += moveY;
             }
+        } else {
+            drill.waitingForFlip = false; // Reset if they let go
         }
+        
         drill.isDrilling = joysticks.drill.active;
 
         // Viewport boundaries for mirror
         mirror.x = Math.max(mirror.radius, Math.min(canvas.width - mirror.radius, mirror.x));
         mirror.y = Math.max(mirror.radius, Math.min(canvas.height - mirror.radius, mirror.y));
 
+        // --- CAVITY CLEARING ---
         let activeCavities = 0;
         arch.teeth.forEach(tooth => {
             tooth.cavities.forEach(c => {
                 if (!c.cleared) {
                     activeCavities++;
-                    
                     const dTarget = Math.hypot(drill.x - tooth.x, drill.y - tooth.y);
-                    
-                    // FIX: Added '&& isInsideMirror' so you MUST be using the mirror to cut
                     if (dTarget < c.radius + 6 && drill.isDrilling && isInsideMirror) {
                         c.health -= 1.8;
                         createParticles(drill.x, drill.y);
@@ -315,29 +342,120 @@
         requestAnimationFrame(update);
     }
 
-    function drawTooth(c, x, y, type, isBright, cavities) {
-        c.save(); c.translate(x, y);
+    function drawTooth(c, x, y, type, isBright, cavities, angle) {
+        c.save(); 
+        c.translate(x, y);
+        c.rotate(angle - Math.PI/2); // Aligns tooth perfectly with the U-curve
+        
         c.fillStyle = isBright ? '#ffffff' : '#222';
         c.strokeStyle = isBright ? '#ccc' : '#111';
         c.lineWidth = 1.5;
         
         c.beginPath();
         if (type === "anterior") {
-            c.moveTo(-12, -22); c.bezierCurveTo(-14, -28, 14, -28, 12, -22);
-            c.lineTo(9, 15); c.quadraticCurveTo(0, 20, -9, 15); c.closePath();
-            c.fill();
-            c.beginPath(); c.moveTo(-9, -18); c.lineTo(-7, 10); c.moveTo(9, -18); c.lineTo(7, 10); c.stroke();
+            // Incisor shape
+            c.moveTo(-10, -12); c.quadraticCurveTo(0, -16, 10, -12);
+            c.lineTo(12, 10); c.quadraticCurveTo(0, 14, -12, 10); c.closePath();
+            c.fill(); c.stroke();
+            c.beginPath(); c.moveTo(-8, -8); c.lineTo(-8, 8); c.moveTo(8, -8); c.lineTo(8, 8); 
+            c.strokeStyle = isBright ? 'rgba(0,0,0,0.1)' : '#000'; c.stroke();
+        } else if (type === "canine") {
+            // Pointy Canine shape
+            c.moveTo(-9, -12); c.quadraticCurveTo(0, -16, 9, -12);
+            c.lineTo(11, 4); c.lineTo(0, 14); c.lineTo(-11, 4); c.closePath();
+            c.fill(); c.stroke();
+            c.beginPath(); c.moveTo(0, -10); c.lineTo(0, 10); 
+            c.strokeStyle = isBright ? 'rgba(0,0,0,0.1)' : '#000'; c.stroke();
+        } else if (type === "premolar") {
+            // Oval Premolar shape
+            c.ellipse(0, 0, 14, 10, 0, 0, Math.PI*2);
+            c.fill(); c.stroke();
+            c.beginPath(); c.moveTo(-8, 0); c.lineTo(8, 0); 
+            c.strokeStyle = isBright ? 'rgba(0,0,0,0.2)' : '#000'; c.stroke();
         } else {
-            const s = type === "molar" ? 22 : 18;
+            // Molar shape
+            const s = 15;
             c.moveTo(-s, -s/2); c.quadraticCurveTo(-s, -s, -s/2, -s);
-            c.quadraticCurveTo(0, -s-3, s/2, -s); c.quadraticCurveTo(s, -s, s, -s/2);
-            c.quadraticCurveTo(s+3, 0, s, s/2); c.quadraticCurveTo(s, s, s/2, s);
-            c.quadraticCurveTo(0, s+3, -s/2, s); c.quadraticCurveTo(-s, s, -s, s/2); c.closePath();
-            c.fill();
-            c.beginPath(); c.moveTo(-s+10, 0); c.lineTo(s-10, 0); c.moveTo(0, -s+10); c.lineTo(0, s-10); c.stroke();
+            c.quadraticCurveTo(0, -s-2, s/2, -s); c.quadraticCurveTo(s, -s, s, -s/2);
+            c.quadraticCurveTo(s+2, 0, s, s/2); c.quadraticCurveTo(s, s, s/2, s);
+            c.quadraticCurveTo(0, s+2, -s/2, s); c.quadraticCurveTo(-s, s, -s, s/2); c.closePath();
+            c.fill(); c.stroke();
+            c.beginPath(); c.moveTo(-s+6, 0); c.lineTo(s-6, 0); c.moveTo(0, -s+6); c.lineTo(0, s-6); 
+            c.strokeStyle = isBright ? 'rgba(0,0,0,0.2)' : '#000'; c.stroke();
         }
 
         cavities.forEach(cav => {
             if (!cav.cleared) {
                 c.fillStyle = isBright ? `rgba(60, 30, 15, ${cav.health/100})` : '#000';
-                c.beginPath(); c.moveTo(cav.points
+                c.beginPath(); c.moveTo(cav.points[0].x, cav.points[0].y);
+                cav.points.forEach(p => c.lineTo(p.x, p.y)); c.closePath(); c.fill();
+            }
+        });
+        c.restore();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 1. Draw Dark Arch
+        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, false, t.cavities, t.angle));
+        
+        // 2. Draw Mirror Reflection Area
+        ctx.save();
+        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = '#1c1919'; ctx.fillRect(0,0, canvas.width, canvas.height);
+        
+        // Bright Teeth Inside Mirror
+        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, true, t.cavities, t.angle));
+        ctx.restore();
+
+        // 3. Draw Mirror Frame
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.stroke();
+
+        // 4. Draw Particles
+        updateParticles(); drawParticles(ctx);
+
+        // 5. Draw Drill
+        drawDrill(ctx, drill.x, drill.y);
+    }
+
+    function drawDrill(c, x, y) {
+        c.save(); 
+        c.translate(x, y);
+        c.rotate(-Math.PI/4);
+        
+        // Handle
+        c.fillStyle = '#999'; c.fillRect(-2, -60, 4, 55);
+        // Tapered Neck
+        c.beginPath(); c.moveTo(-2, -5); c.lineTo(2, -5); c.lineTo(1, -2); c.lineTo(-1, -2); c.fill();
+        
+        // Bur Head - Turns Yellow when waiting for user to reverse joystick at boundary
+        c.fillStyle = drill.waitingForFlip ? '#ffcc00' : '#eee';
+        c.beginPath(); c.arc(0, 0, 4, 0, Math.PI * 2); c.fill();
+        
+        if (drill.isDrilling && !drill.waitingForFlip) {
+            c.strokeStyle = 'rgba(200, 255, 255, 0.8)'; c.lineWidth = 1.5;
+            c.beginPath(); c.arc(0, 0, 6, 0, Math.PI*2); c.stroke();
+            c.beginPath(); c.arc(0, 0, 8, 0, Math.PI*2); c.stroke();
+        }
+        c.restore();
+    }
+
+    let particles = [];
+    function createParticles(x, y) {
+        for(let i=0; i<3; i++) particles.push({x, y, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.5)*7, l:1});
+    }
+    function updateParticles() {
+        particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.l-=0.07; });
+        particles = particles.filter(p => p.l > 0);
+    }
+    function drawParticles(c) {
+        particles.forEach(p => { c.fillStyle=`rgba(255,255,255,${p.l})`; c.fillRect(p.x, p.y, 2, 2); });
+    }
+
+    function resize() { canvas.width = viewport.clientWidth; canvas.height = viewport.clientHeight; initArch(); }
+    window.onresize = resize; resize();
+</script>
+</body>
+</html>
