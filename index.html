@@ -146,7 +146,7 @@
     const arch = { teeth: [] };
     const joysticks = {
         mirror: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 },
-        drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
+        drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50, inverted: false }
     };
 
     const mirror = { x: 0, y: 0, radius: 100, baseSpeed: 5 };
@@ -207,6 +207,12 @@
             if (!gameActive || e.target.type === 'range') return;
             e.preventDefault();
             stickData.active = true;
+
+            // FIX: Lock inversion state on touch/click to prevent boundary bounce bug
+            if (stickData === joysticks.drill) {
+                stickData.inverted = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
+            }
+
             const touch = e.type === 'touchstart' ? e.changedTouches[0] : e;
             if (e.type === 'touchstart') stickData.id = touch.identifier;
             updateJoystick(touch, base, knob, stickData);
@@ -256,7 +262,7 @@
     function update() {
         if (!gameActive) return;
 
-        // Determine if drill is inside the mirror boundary to trigger inverted logic
+        // Determine if drill is inside the mirror boundary (used for clearing logic)
         const isInsideMirror = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
 
         if (joysticks.mirror.active) {
@@ -268,12 +274,11 @@
             let moveX = joysticks.drill.dX * (drill.baseSpeed * drillSens);
             let moveY = joysticks.drill.dY * (drill.baseSpeed * drillSens);
 
-            if (isInsideMirror) {
-                // Inverted Movement when inside mirror
+            // Use the locked inverted state determined when the user grabbed the joystick
+            if (joysticks.drill.inverted) {
                 drill.x -= moveX;
                 drill.y -= moveY;
             } else {
-                // Normal Movement when outside
                 drill.x += moveX;
                 drill.y += moveY;
             }
@@ -290,10 +295,10 @@
                 if (!c.cleared) {
                     activeCavities++;
                     
-                    // Unified collision: Just check distance from drill's true position to cavity
                     const dTarget = Math.hypot(drill.x - tooth.x, drill.y - tooth.y);
                     
-                    if (dTarget < c.radius + 6 && drill.isDrilling) {
+                    // FIX: Added '&& isInsideMirror' so you MUST be using the mirror to cut
+                    if (dTarget < c.radius + 6 && drill.isDrilling && isInsideMirror) {
                         c.health -= 1.8;
                         createParticles(drill.x, drill.y);
                         if (c.health <= 0) {
@@ -335,89 +340,4 @@
         cavities.forEach(cav => {
             if (!cav.cleared) {
                 c.fillStyle = isBright ? `rgba(60, 30, 15, ${cav.health/100})` : '#000';
-                c.beginPath(); c.moveTo(cav.points[0].x, cav.points[0].y);
-                cav.points.forEach(p => c.lineTo(p.x, p.y)); c.closePath(); c.fill();
-            }
-        });
-        c.restore();
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 1. Draw Dark Arch (Background)
-        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, false, t.cavities));
-        
-        // 2. Draw Mirror Reflection Area
-        ctx.save();
-        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.clip();
-        
-        // Mirror Glass
-        ctx.fillStyle = '#1c1919'; ctx.fillRect(0,0, canvas.width, canvas.height);
-        
-        // Bright Teeth Inside Mirror
-        arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, true, t.cavities));
-        
-        ctx.restore();
-
-        // 3. Draw Mirror Frame & Handle
-        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 10;
-        ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.stroke();
-
-        // 4. Draw Particles globally
-        updateParticles(); drawParticles(ctx);
-
-        // 5. Draw the Single Unified Drill
-        drawDrill(ctx, drill.x, drill.y);
-    }
-
-    function drawDrill(c, x, y) {
-        c.save(); 
-        c.translate(x, y);
-        c.rotate(-Math.PI/4);
-        
-        // Handle (Straight Shank)
-        c.fillStyle = '#999';
-        c.fillRect(-2, -60, 4, 55);
-        
-        // Tapered Neck
-        c.beginPath();
-        c.moveTo(-2, -5);
-        c.lineTo(2, -5);
-        c.lineTo(1, -2);
-        c.lineTo(-1, -2);
-        c.fill();
-        
-        // Round Bur Head (Centered perfectly at target coordinates)
-        c.fillStyle = '#eee';
-        c.beginPath(); 
-        c.arc(0, 0, 4, 0, Math.PI * 2); 
-        c.fill();
-        
-        // Bur Rotation Effect
-        if (drill.isDrilling) {
-            c.strokeStyle = 'rgba(200, 255, 255, 0.8)';
-            c.lineWidth = 1.5;
-            c.beginPath(); c.arc(0, 0, 6, 0, Math.PI*2); c.stroke();
-            c.beginPath(); c.arc(0, 0, 8, 0, Math.PI*2); c.stroke();
-        }
-        c.restore();
-    }
-
-    let particles = [];
-    function createParticles(x, y) {
-        for(let i=0; i<3; i++) particles.push({x, y, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.5)*7, l:1});
-    }
-    function updateParticles() {
-        particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.l-=0.07; });
-        particles = particles.filter(p => p.l > 0);
-    }
-    function drawParticles(c) {
-        particles.forEach(p => { c.fillStyle=`rgba(255,255,255,${p.l})`; c.fillRect(p.x, p.y, 2, 2); });
-    }
-
-    function resize() { canvas.width = viewport.clientWidth; canvas.height = viewport.clientHeight; initArch(); }
-    window.onresize = resize; resize();
-</script>
-</body>
-</html>
+                c.beginPath(); c.moveTo(cav.points
