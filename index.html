@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Indirect Vision Trainer - Pro V9</title>
+    <title>Dental Indirect Vision Trainer - Modified</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -115,7 +115,7 @@
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
             <div class="stats" id="score-display">Cavities Cleared: 0</div>
-            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V9 (Render Fix)</div>
+            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training - Modified</div>
         </div>
         <div class="msg-box" id="start-screen">
             <h2>Dental Indirect Vision</h2>
@@ -153,13 +153,17 @@
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
-    const mirror = { x: 0, y: 0, radius: 100, baseSpeed: 5 };
+    // MODIFICATION 1: Smaller mirror (halved radius from 100 to 50)
+    const mirror = { x: 0, y: 0, radius: 50, baseSpeed: 5 }; 
     const drill = { x: 0, y: 0, baseSpeed: 6, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
     function initArch() {
         arch.teeth = [];
         const centerX = canvas.width / 2;
         const centerY = canvas.height * 0.25; 
+        
+        // MODIFICATION 2: Adjusted a and b to keep the arch generally the same size,
+        // but the teeth drawing function is scaled up to reduce spacing.
         const a = canvas.width * 0.35; 
         const b = canvas.height * 0.5; 
 
@@ -187,7 +191,9 @@
             
             const randomTooth = availableTeeth[Math.floor(Math.random() * availableTeeth.length)];
             const points = [];
-            const baseRad = (randomTooth.type === 'molar') ? 8 + Math.random() * 4 : 4 + Math.random() * 3;
+            
+            // MODIFICATION 2.1: Scaled cavity base radius to match larger teeth
+            const baseRad = (randomTooth.type === 'molar') ? 12 + Math.random() * 6 : 6 + Math.random() * 4.5;
             
             for (let p = 0; p < 8; p++) {
                 const angle = (p / 8) * Math.PI * 2;
@@ -345,9 +351,14 @@
         c.translate(x, y);
         c.rotate(angle - Math.PI/2); 
         
+        // MODIFICATION 2.2: Scale factor applied to tooth drawing coordinates to make teeth larger
+        // and reduce visual spacing between them.
+        const scale = 1.7; 
+        c.scale(scale, scale);
+        
         c.fillStyle = isBright ? '#ffffff' : '#222';
         c.strokeStyle = isBright ? '#ccc' : '#111';
-        c.lineWidth = 1.5;
+        c.lineWidth = 1.5 / scale; // Keep stroke visually similar
         
         c.beginPath();
         if (type === "anterior") {
