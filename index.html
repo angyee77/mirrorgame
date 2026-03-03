@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Indirect Vision Trainer - Modified</title>
+    <title>Dental Indirect Vision Trainer - Pro V9 Modified</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -115,7 +115,7 @@
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
             <div class="stats" id="score-display">Cavities Cleared: 0</div>
-            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training - Modified</div>
+            <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V9 Modified</div>
         </div>
         <div class="msg-box" id="start-screen">
             <h2>Dental Indirect Vision</h2>
@@ -153,17 +153,15 @@
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
-    // MODIFICATION 1: Smaller mirror (halved radius from 100 to 50)
+    // Kept the smaller mirror from the previous modification
     const mirror = { x: 0, y: 0, radius: 50, baseSpeed: 5 }; 
-    const drill = { x: 0, y: 0, baseSpeed: 6, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
+    // Increased base speed slightly to compensate for potential perceived lag
+    const drill = { x: 0, y: 0, baseSpeed: 8, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
     function initArch() {
         arch.teeth = [];
         const centerX = canvas.width / 2;
         const centerY = canvas.height * 0.25; 
-        
-        // MODIFICATION 2: Adjusted a and b to keep the arch generally the same size,
-        // but the teeth drawing function is scaled up to reduce spacing.
         const a = canvas.width * 0.35; 
         const b = canvas.height * 0.5; 
 
@@ -191,8 +189,6 @@
             
             const randomTooth = availableTeeth[Math.floor(Math.random() * availableTeeth.length)];
             const points = [];
-            
-            // MODIFICATION 2.1: Scaled cavity base radius to match larger teeth
             const baseRad = (randomTooth.type === 'molar') ? 12 + Math.random() * 6 : 6 + Math.random() * 4.5;
             
             for (let p = 0; p < 8; p++) {
@@ -204,7 +200,6 @@
         }
     }
 
-    // --- JOYSTICK LOGIC ---
     function updateJoystick(clientPos, base, knob, stickData) {
         const rect = base.getBoundingClientRect();
         const dx = clientPos.clientX - (rect.left + rect.width / 2);
@@ -213,8 +208,16 @@
         const angle = Math.atan2(dy, dx);
         const finalX = Math.cos(angle) * dist;
         const finalY = Math.sin(angle) * dist;
-        stickData.dX = finalX / stickData.maxDist;
-        stickData.dY = finalY / stickData.maxDist;
+        
+        // ADDED A SMALL DEADZONE to prevent unwanted drift
+        if (dist < 5) {
+            stickData.dX = 0;
+            stickData.dY = 0;
+        } else {
+            stickData.dX = finalX / stickData.maxDist;
+            stickData.dY = finalY / stickData.maxDist;
+        }
+        
         knob.style.transform = `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px))`;
     }
 
@@ -238,7 +241,13 @@
             if (touch) updateJoystick(touch, base, knob, stickData);
         };
 
-        const onEnd = () => {
+        const onEnd = (e) => {
+            // Check if the ended touch matches the joystick's tracked touch
+            if (e.type === 'touchend') {
+               let touchEnded = Array.from(e.changedTouches).find(t => t.identifier === stickData.id);
+               if(!touchEnded) return; // Ignore if a different finger lifted
+            }
+
             stickData.active = false; stickData.dX = 0; stickData.dY = 0;
             knob.style.transform = `translate(-50%, -50%)`;
         };
@@ -276,13 +285,11 @@
     function update() {
         if (!gameActive) return;
 
-        // --- MIRROR MOVEMENT ---
         if (joysticks.mirror.active) {
             mirror.x += joysticks.mirror.dX * (mirror.baseSpeed * mirrorSens);
             mirror.y += joysticks.mirror.dY * (mirror.baseSpeed * mirrorSens);
         }
 
-        // --- SEAMLESS DRILL INVERSION LOGIC ---
         const isInsideMirror = Math.hypot(drill.x - mirror.x, drill.y - mirror.y) < mirror.radius;
         if (drill.wasInside === undefined) drill.wasInside = isInsideMirror;
 
@@ -295,8 +302,12 @@
 
         if (joysticks.drill.active) {
             if (drill.waitingForFlip) {
+                // FIXED THE LAG/STUCK ISSUE HERE
+                // The previous dot product check was too strict. 
+                // We now check if the joystick is pulled significantly in the opposite direction
                 let dot = joysticks.drill.dX * drill.entryX + joysticks.drill.dY * drill.entryY;
-                if (dot <= 0.1) drill.waitingForFlip = false; 
+                // If the user reverses direction (dot < 0) or wiggles enough, free the drill
+                if (dot <= 0.2) drill.waitingForFlip = false; 
             }
 
             let moveX = 0, moveY = 0;
@@ -321,7 +332,6 @@
         mirror.x = Math.max(mirror.radius, Math.min(canvas.width - mirror.radius, mirror.x));
         mirror.y = Math.max(mirror.radius, Math.min(canvas.height - mirror.radius, mirror.y));
 
-        // --- CAVITY CLEARING ---
         let activeCavities = 0;
         arch.teeth.forEach(tooth => {
             tooth.cavities.forEach(c => {
@@ -345,20 +355,17 @@
         requestAnimationFrame(update);
     }
 
-    // PASS 1: DRAW TOOTH BODIES ONLY
     function drawTooth(c, x, y, type, isBright, angle) {
         c.save(); 
         c.translate(x, y);
         c.rotate(angle - Math.PI/2); 
         
-        // MODIFICATION 2.2: Scale factor applied to tooth drawing coordinates to make teeth larger
-        // and reduce visual spacing between them.
         const scale = 1.7; 
         c.scale(scale, scale);
         
         c.fillStyle = isBright ? '#ffffff' : '#222';
         c.strokeStyle = isBright ? '#ccc' : '#111';
-        c.lineWidth = 1.5 / scale; // Keep stroke visually similar
+        c.lineWidth = 1.5 / scale; 
         
         c.beginPath();
         if (type === "anterior") {
@@ -391,7 +398,6 @@
         c.restore();
     }
 
-    // PASS 2: DRAW CAVITIES ONLY
     function drawCavities(c, x, y, isBright, cavities, angle) {
         c.save(); 
         c.translate(x, y);
@@ -417,31 +423,22 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // --- OUTSIDE MIRROR RENDER ---
-        // Pass 1: Teeth bases
         arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, false, t.angle));
-        // Pass 2: Cavities layered firmly on top
         arch.teeth.forEach(t => drawCavities(ctx, t.x, t.y, false, t.cavities, t.angle));
         
-        // --- INSIDE MIRROR RENDER ---
         ctx.save();
         ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.clip();
         ctx.fillStyle = '#1c1919'; ctx.fillRect(0,0, canvas.width, canvas.height);
         
-        // Pass 1: Bright Teeth bases
         arch.teeth.forEach(t => drawTooth(ctx, t.x, t.y, t.type, true, t.angle));
-        // Pass 2: Bright Cavities layered firmly on top
         arch.teeth.forEach(t => drawCavities(ctx, t.x, t.y, true, t.cavities, t.angle));
         ctx.restore();
 
-        // 3. Draw Mirror Frame
         ctx.strokeStyle = '#aaa'; ctx.lineWidth = 10;
         ctx.beginPath(); ctx.arc(mirror.x, mirror.y, mirror.radius, 0, Math.PI * 2); ctx.stroke();
 
-        // 4. Draw Particles
         updateParticles(); drawParticles(ctx);
 
-        // 5. Draw Drill
         drawDrill(ctx, drill.x, drill.y);
     }
 
@@ -450,12 +447,9 @@
         c.translate(x, y);
         c.rotate(-Math.PI/4);
         
-        // Handle
         c.fillStyle = '#999'; c.fillRect(-2, -60, 4, 55);
-        // Tapered Neck
         c.beginPath(); c.moveTo(-2, -5); c.lineTo(2, -5); c.lineTo(1, -2); c.lineTo(-1, -2); c.fill();
         
-        // Bur Head
         c.fillStyle = drill.waitingForFlip ? '#ffcc00' : '#eee';
         c.beginPath(); c.arc(0, 0, 4, 0, Math.PI * 2); c.fill();
         
