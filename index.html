@@ -15,14 +15,13 @@
 
         body {
             margin: 0; padding: 0;
-            background-color: #000; /* Deep black for the letterbox edges */
+            background-color: #000; 
             color: #e5e7eb;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
             touch-action: none; 
             user-select: none;
             -webkit-user-select: none;
-            /* Flexbox perfectly centers the game wrapper */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -30,7 +29,6 @@
             height: 100vh;
         }
 
-        /* This math guarantees a flawless 2:1 Aspect Ratio on ANY screen */
         #game-wrapper {
             position: relative;
             width: 100%;
@@ -139,7 +137,7 @@
             border-radius: 8px; cursor: pointer;
             margin-top: 15px; font-weight: bold; font-size: clamp(0.9rem, 2vw, 1.1rem);
             transition: transform 0.1s, background 0.2s;
-            pointer-events: auto; /* Ensures button is always clickable */
+            pointer-events: auto; 
         }
         .btn:active { transform: scale(0.95); }
     </style>
@@ -220,9 +218,13 @@
     function initArch() {
         arch.teeth = [];
         const centerX = canvas.width / 2;
-        const centerY = canvas.height * 0.25; 
-        const a = canvas.width * 0.35; 
-        const b = canvas.height * 0.5; 
+        
+        // Pushed the arch significantly lower to clear the UI
+        const centerY = canvas.height * 0.35; 
+        
+        // Narrowed the arch (0.24) and slightly shortened it (0.45) to pack teeth together
+        const a = canvas.width * 0.24; 
+        const b = canvas.height * 0.45; 
 
         for (let i = 0; i < 16; i++) {
             const t = Math.PI - (i / 15) * Math.PI; 
@@ -249,8 +251,8 @@
             const randomTooth = availableTeeth[Math.floor(Math.random() * availableTeeth.length)];
             const points = [];
             
-            // Standardized internal cavity size
-            const baseRad = canvas.width * 0.015; 
+            // Scaled up the standard cavity size to match the bigger teeth
+            const baseRad = canvas.width * 0.018; 
             
             for (let p = 0; p < 8; p++) {
                 const angle = (p / 8) * Math.PI * 2;
@@ -263,14 +265,13 @@
 
     function updateJoystick(clientPos, base, knob, stickData) {
         const rect = base.getBoundingClientRect();
-        const maxDist = rect.width / 2; // Dynamically scale to screen size
+        const maxDist = rect.width / 2; 
         
         const dx = clientPos.clientX - (rect.left + rect.width / 2);
         const dy = clientPos.clientY - (rect.top + rect.height / 2);
         const dist = Math.min(Math.hypot(dx, dy), maxDist);
         const angle = Math.atan2(dy, dx);
         
-        // 15% Deadzone to prevent micro-drifts
         if (dist < maxDist * 0.15) {
             stickData.dX = 0;
             stickData.dY = 0;
@@ -403,7 +404,6 @@
         requestAnimationFrame(update);
     }
 
-    // Double binding click & touchstart to guarantee it registers on tricky mobile browsers
     const startBtn = document.getElementById('start-btn');
     startBtn.onclick = (e) => { e.preventDefault(); startGame(); };
     startBtn.ontouchstart = (e) => { e.preventDefault(); startGame(); };
@@ -415,7 +415,6 @@
     function update() {
         if (!gameActive) return;
 
-        // Dynamic speed based on canvas size to ensure it feels same on big and small screens
         const currentMirrorSpeed = (canvas.width * 0.007) * mirrorSens;
         const currentDrillSpeed = (canvas.width * 0.007) * drillSens;
         const currentMirrorRadius = canvas.width * 0.08;
@@ -470,7 +469,8 @@
                 if (!c.cleared) {
                     activeCavities++;
                     const dTarget = Math.hypot(drill.x - tooth.x, drill.y - tooth.y);
-                    if (dTarget < c.radius + (canvas.width * 0.01) && drill.isDrilling && isInsideMirror) {
+                    // Adjusted collision radius to account for the visibly larger drill
+                    if (dTarget < c.radius + (canvas.width * 0.015) && drill.isDrilling && isInsideMirror) {
                         c.health -= 1.8;
                         createParticles(drill.x, drill.y);
                         if (c.health <= 0) {
@@ -492,8 +492,8 @@
         c.translate(x, y);
         c.rotate(angle - Math.PI/2); 
         
-        // Dynamic scaling based on canvas size
-        const scale = canvas.width * 0.0025; 
+        // Increased tooth scale to ensure they touch/overlap realistically
+        const scale = canvas.width * 0.003; 
         c.scale(scale, scale);
         
         c.fillStyle = isBright ? '#ffffff' : '#222';
@@ -580,7 +580,8 @@
         c.translate(x, y);
         c.rotate(-Math.PI/4);
         
-        const drillScale = canvas.width * 0.001;
+        // Increased drill size by roughly 2x for much better realism
+        const drillScale = canvas.width * 0.002;
         
         c.scale(drillScale, drillScale);
         c.fillStyle = '#999'; c.fillRect(-2, -60, 4, 55);
@@ -609,13 +610,12 @@
         particles.forEach(p => { c.fillStyle=`rgba(255,255,255,${p.l})`; c.fillRect(p.x, p.y, 2, 2); });
     }
 
-    // Dynamic resize binding that maps the logical canvas 1:1 with the screen layout!
     function resize() { 
         if(!viewport) return;
         canvas.width = viewport.clientWidth; 
         canvas.height = viewport.clientHeight; 
         initArch(); 
-        if(!gameActive) draw(); // Render layout before pressing start
+        if(!gameActive) draw(); 
     }
     
     window.addEventListener('resize', resize); 
