@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dental Indirect Vision Trainer - Pro V9 Modified</title>
+    <title>Dental Indirect Vision Trainer - Pro V9 Modified (Timed Challenge)</title>
     <style>
         :root {
             --bg-color: #050505;
@@ -82,6 +82,9 @@
             backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        .stats { margin-bottom: 5px; font-weight: bold; }
+        .timer-alert { color: var(--drill-color); }
+
         .msg-box {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
@@ -91,12 +94,35 @@
             z-index: 100; width: 80%; max-width: 450px;
         }
 
+        /* Fog Overlay Styles */
+        #game-over-screen {
+            display: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(200, 210, 220, 0.3); /* Fog color */
+            backdrop-filter: blur(12px); /* Fog blur effect */
+            z-index: 200;
+            align-items: center; justify-content: center;
+        }
+
+        .result-box {
+            background: rgba(10, 10, 15, 0.95);
+            padding: 40px; border-radius: 16px; text-align: center;
+            border: 3px solid var(--drill-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        #result-icon { font-size: 5rem; margin-bottom: 10px; line-height: 1; }
+        .result-box h2 { margin: 10px 0; font-size: 2rem; }
+        .result-box p { color: #aaa; margin-bottom: 20px; font-size: 1.1rem; }
+
         .btn {
             background: var(--accent-color); color: white;
             border: none; padding: 14px 28px;
             border-radius: 8px; cursor: pointer;
             margin-top: 15px; font-weight: bold; font-size: 1.1rem;
+            transition: transform 0.1s, background 0.2s;
         }
+        .btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
@@ -114,16 +140,28 @@
     <div id="viewport">
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
-            <div class="stats" id="score-display">Cavities Cleared: 0</div>
+            <div class="stats" id="time-display">Time Left: 20s</div>
+            <div class="stats" id="score-display">Cavities Cleared: 0 / 15</div>
             <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V9 Modified</div>
         </div>
+        
         <div class="msg-box" id="start-screen">
-            <h2>Dental Indirect Vision</h2>
+            <h2>Time Challenge!</h2>
             <p style="font-size: 0.95rem; color: #aaa;">
                 1. Drill movement inverts inside the mirror.<br><br>
-                2. <b>Seamless Entry:</b> When crossing the mirror boundary, your drill will pause. Reverse your joystick direction to continue moving inside!
+                2. <b>Goal:</b> Clear at least <b>15 cavities</b> in <b>20 seconds</b>.<br><br>
+                3. Move fast, or the mirror fogs up!
             </p>
             <button id="start-btn" class="btn">Commence</button>
+        </div>
+
+        <div id="game-over-screen">
+            <div class="result-box" id="result-box">
+                <div id="result-icon">👎</div>
+                <h2 id="result-title">Challenge Failed</h2>
+                <p id="result-desc">You didn't clear enough cavities.</p>
+                <button id="restart-btn" class="btn">Play Again</button>
+            </div>
         </div>
     </div>
 
@@ -144,6 +182,10 @@
     
     let gameActive = false;
     let score = 0;
+    const requiredScore = 15;
+    let timeLeft = 20;
+    let timerInterval;
+
     let mirrorSens = 1.0;
     let drillSens = 1.0;
 
@@ -153,9 +195,7 @@
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
-    // Kept the smaller mirror from the previous modification
     const mirror = { x: 0, y: 0, radius: 50, baseSpeed: 5 }; 
-    // Increased base speed slightly to compensate for potential perceived lag
     const drill = { x: 0, y: 0, baseSpeed: 8, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
     function initArch() {
@@ -209,7 +249,6 @@
         const finalX = Math.cos(angle) * dist;
         const finalY = Math.sin(angle) * dist;
         
-        // ADDED A SMALL DEADZONE to prevent unwanted drift
         if (dist < 5) {
             stickData.dX = 0;
             stickData.dY = 0;
@@ -242,12 +281,10 @@
         };
 
         const onEnd = (e) => {
-            // Check if the ended touch matches the joystick's tracked touch
             if (e.type === 'touchend') {
                let touchEnded = Array.from(e.changedTouches).find(t => t.identifier === stickData.id);
-               if(!touchEnded) return; // Ignore if a different finger lifted
+               if(!touchEnded) return; 
             }
-
             stickData.active = false; stickData.dX = 0; stickData.dY = 0;
             knob.style.transform = `translate(-50%, -50%)`;
         };
@@ -272,15 +309,80 @@
         document.getElementById('drill-sens-val').innerText = e.target.value + '%';
     };
 
+    function startTimer() {
+        const timeDisplay = document.getElementById('time-display');
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timeDisplay.innerText = `Time Left: ${timeLeft}s`;
+            
+            if (timeLeft <= 5) {
+                timeDisplay.classList.add('timer-alert');
+            }
+            
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }, 1000);
+    }
+
+    function endGame() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const resultBox = document.getElementById('result-box');
+        const resultIcon = document.getElementById('result-icon');
+        const resultTitle = document.getElementById('result-title');
+        const resultDesc = document.getElementById('result-desc');
+
+        // Check Win/Loss condition
+        if (score >= requiredScore) {
+            resultIcon.innerText = "👍";
+            resultTitle.innerText = "Challenge Passed!";
+            resultDesc.innerText = `Amazing precision! You cleared ${score} cavities.`;
+            resultBox.style.borderColor = "#10b981"; // Green for win
+        } else {
+            resultIcon.innerText = "👎";
+            resultTitle.innerText = "Challenge Failed!";
+            resultDesc.innerText = `You only cleared ${score} out of ${requiredScore} cavities.`;
+            resultBox.style.borderColor = "var(--drill-color)"; // Red for loss
+        }
+
+        gameOverScreen.style.display = 'flex';
+        
+        // Reset joystick states visually so they don't stick
+        joysticks.mirror.active = false; joysticks.mirror.dX = 0; joysticks.mirror.dY = 0;
+        document.getElementById('mirror-knob').style.transform = `translate(-50%, -50%)`;
+        joysticks.drill.active = false; joysticks.drill.dX = 0; joysticks.drill.dY = 0;
+        document.getElementById('drill-knob').style.transform = `translate(-50%, -50%)`;
+    }
+
     function startGame() {
-        gameActive = true;
+        score = 0;
+        timeLeft = 20;
+        document.getElementById('score-display').innerText = `Cavities Cleared: ${score} / ${requiredScore}`;
+        document.getElementById('time-display').innerText = `Time Left: ${timeLeft}s`;
+        document.getElementById('time-display').classList.remove('timer-alert');
+        
         document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        gameActive = true;
         resize();
+        
         mirror.x = canvas.width / 2; mirror.y = canvas.height / 2;
         drill.x = canvas.width / 2 + 50; drill.y = canvas.height / 2 + 100;
+        
+        startTimer();
         requestAnimationFrame(update);
     }
+
     document.getElementById('start-btn').onclick = startGame;
+    document.getElementById('restart-btn').onclick = () => {
+        generateCavities(); // Reset map for new game
+        startGame();
+    };
 
     function update() {
         if (!gameActive) return;
@@ -302,11 +404,7 @@
 
         if (joysticks.drill.active) {
             if (drill.waitingForFlip) {
-                // FIXED THE LAG/STUCK ISSUE HERE
-                // The previous dot product check was too strict. 
-                // We now check if the joystick is pulled significantly in the opposite direction
                 let dot = joysticks.drill.dX * drill.entryX + joysticks.drill.dY * drill.entryY;
-                // If the user reverses direction (dot < 0) or wiggles enough, free the drill
                 if (dot <= 0.2) drill.waitingForFlip = false; 
             }
 
@@ -343,7 +441,7 @@
                         createParticles(drill.x, drill.y);
                         if (c.health <= 0) {
                             c.cleared = true; score++;
-                            document.getElementById('score-display').innerText = `Cavities Cleared: ${score}`;
+                            document.getElementById('score-display').innerText = `Cavities Cleared: ${score} / ${requiredScore}`;
                         }
                     }
                 }
