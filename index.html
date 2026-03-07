@@ -94,12 +94,11 @@
             z-index: 100; width: 80%; max-width: 450px;
         }
 
-        /* Fog Overlay Styles */
         #game-over-screen {
             display: none;
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(200, 210, 220, 0.3); /* Fog color */
-            backdrop-filter: blur(12px); /* Fog blur effect */
+            background: rgba(200, 210, 220, 0.3);
+            backdrop-filter: blur(12px); 
             z-index: 200;
             align-items: center; justify-content: center;
         }
@@ -195,8 +194,9 @@
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
+    // Reduced base speeds for finer control
     const mirror = { x: 0, y: 0, radius: 50, baseSpeed: 5 }; 
-    const drill = { x: 0, y: 0, baseSpeed: 8, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
+    const drill = { x: 0, y: 0, baseSpeed: 5, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
     function initArch() {
         arch.teeth = [];
@@ -246,17 +246,23 @@
         const dy = clientPos.clientY - (rect.top + rect.height / 2);
         const dist = Math.min(Math.hypot(dx, dy), stickData.maxDist);
         const angle = Math.atan2(dy, dx);
-        const finalX = Math.cos(angle) * dist;
-        const finalY = Math.sin(angle) * dist;
         
-        if (dist < 5) {
+        // Fix #1: Wider deadzone to stop micro-drifts when finger is resting
+        if (dist < 10) {
             stickData.dX = 0;
             stickData.dY = 0;
         } else {
-            stickData.dX = finalX / stickData.maxDist;
-            stickData.dY = finalY / stickData.maxDist;
+            // Fix #2: Exponential curve for fine control at low speeds
+            const normalizedDist = dist / stickData.maxDist;
+            const curvedDist = Math.pow(normalizedDist, 1.5); // Curves the output
+            
+            stickData.dX = Math.cos(angle) * curvedDist;
+            stickData.dY = Math.sin(angle) * curvedDist;
         }
         
+        // Visual knob position remains perfectly linear to the finger
+        const finalX = Math.cos(angle) * dist;
+        const finalY = Math.sin(angle) * dist;
         knob.style.transform = `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px))`;
     }
 
@@ -336,22 +342,20 @@
         const resultTitle = document.getElementById('result-title');
         const resultDesc = document.getElementById('result-desc');
 
-        // Check Win/Loss condition
         if (score >= requiredScore) {
             resultIcon.innerText = "👍";
             resultTitle.innerText = "Challenge Passed!";
             resultDesc.innerText = `Amazing precision! You cleared ${score} cavities.`;
-            resultBox.style.borderColor = "#10b981"; // Green for win
+            resultBox.style.borderColor = "#10b981"; 
         } else {
             resultIcon.innerText = "👎";
             resultTitle.innerText = "Challenge Failed!";
             resultDesc.innerText = `You only cleared ${score} out of ${requiredScore} cavities.`;
-            resultBox.style.borderColor = "var(--drill-color)"; // Red for loss
+            resultBox.style.borderColor = "var(--drill-color)"; 
         }
 
         gameOverScreen.style.display = 'flex';
         
-        // Reset joystick states visually so they don't stick
         joysticks.mirror.active = false; joysticks.mirror.dX = 0; joysticks.mirror.dY = 0;
         document.getElementById('mirror-knob').style.transform = `translate(-50%, -50%)`;
         joysticks.drill.active = false; joysticks.drill.dX = 0; joysticks.drill.dY = 0;
@@ -380,7 +384,7 @@
 
     document.getElementById('start-btn').onclick = startGame;
     document.getElementById('restart-btn').onclick = () => {
-        generateCavities(); // Reset map for new game
+        generateCavities();
         startGame();
     };
 
