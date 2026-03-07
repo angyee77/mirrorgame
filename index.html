@@ -140,7 +140,7 @@
     <div id="viewport">
         <canvas id="gameCanvas"></canvas>
         <div class="ui-overlay">
-            <div class="stats" id="time-display">Time Left: 20s</div>
+            <div class="stats" id="time-display">Time Left: 60s</div>
             <div class="stats" id="score-display">Cavities Cleared: 0 / 15</div>
             <div style="font-size: 0.7rem; opacity: 0.7;">Anatomical Training V9 Modified</div>
         </div>
@@ -149,7 +149,7 @@
             <h2>Time Challenge!</h2>
             <p style="font-size: 0.95rem; color: #aaa;">
                 1. Drill movement inverts inside the mirror.<br><br>
-                2. <b>Goal:</b> Clear at least <b>15 cavities</b> in <b>20 seconds</b>.<br><br>
+                2. <b>Goal:</b> Clear at least <b>15 cavities</b> in <b>60 seconds</b>.<br><br>
                 3. Move fast, or the mirror fogs up!
             </p>
             <button id="start-btn" class="btn">Commence</button>
@@ -183,7 +183,7 @@
     let gameActive = false;
     let score = 0;
     const requiredScore = 15;
-    let timeLeft = 20;
+    let timeLeft = 60;
     let timerInterval;
 
     let mirrorSens = 1.0;
@@ -316,7 +316,7 @@
             timeLeft--;
             timeDisplay.innerText = `Time Left: ${timeLeft}s`;
             
-            if (timeLeft <= 5) {
+            if (timeLeft <= 10) { // Changed to alert at 10 seconds since it's a 60s timer
                 timeDisplay.classList.add('timer-alert');
             }
             
@@ -360,7 +360,7 @@
 
     function startGame() {
         score = 0;
-        timeLeft = 20;
+        timeLeft = 60;
         document.getElementById('score-display').innerText = `Cavities Cleared: ${score} / ${requiredScore}`;
         document.getElementById('time-display').innerText = `Time Left: ${timeLeft}s`;
         document.getElementById('time-display').classList.remove('timer-alert');
