@@ -194,7 +194,6 @@
         drill: { id: null, active: false, dX: 0, dY: 0, maxDist: 50 }
     };
 
-    // Reduced base speeds for finer control
     const mirror = { x: 0, y: 0, radius: 50, baseSpeed: 5 }; 
     const drill = { x: 0, y: 0, baseSpeed: 5, isDrilling: false, waitingForFlip: false, wasInside: undefined, entryX: 0, entryY: 0 };
 
@@ -229,11 +228,14 @@
             
             const randomTooth = availableTeeth[Math.floor(Math.random() * availableTeeth.length)];
             const points = [];
-            const baseRad = (randomTooth.type === 'molar') ? 12 + Math.random() * 6 : 6 + Math.random() * 4.5;
+            
+            // Fixed cavity size for fair gameplay across all teeth
+            const baseRad = 10; 
             
             for (let p = 0; p < 8; p++) {
                 const angle = (p / 8) * Math.PI * 2;
-                const r = baseRad * (0.6 + Math.random() * 0.8);
+                // Tighter random range so shapes are more uniformly round
+                const r = baseRad * (0.8 + Math.random() * 0.4); 
                 points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
             }
             randomTooth.cavities.push({ points, health: 100, cleared: false, radius: baseRad });
@@ -247,20 +249,17 @@
         const dist = Math.min(Math.hypot(dx, dy), stickData.maxDist);
         const angle = Math.atan2(dy, dx);
         
-        // Fix #1: Wider deadzone to stop micro-drifts when finger is resting
         if (dist < 10) {
             stickData.dX = 0;
             stickData.dY = 0;
         } else {
-            // Fix #2: Exponential curve for fine control at low speeds
             const normalizedDist = dist / stickData.maxDist;
-            const curvedDist = Math.pow(normalizedDist, 1.5); // Curves the output
+            const curvedDist = Math.pow(normalizedDist, 1.5); 
             
             stickData.dX = Math.cos(angle) * curvedDist;
             stickData.dY = Math.sin(angle) * curvedDist;
         }
         
-        // Visual knob position remains perfectly linear to the finger
         const finalX = Math.cos(angle) * dist;
         const finalY = Math.sin(angle) * dist;
         knob.style.transform = `translate(calc(-50% + ${finalX}px), calc(-50% + ${finalY}px))`;
